@@ -19,9 +19,20 @@
             --sw-ball: #000000;
         }
 
-        body { font-family: -apple-system, sans-serif; background: var(--bg); color: var(--main); margin: 0; min-height: 100vh; overflow-x: hidden; }
+        body { font-family: -apple-system, sans-serif; background: var(--bg); color: var(--main); margin: 0; min-height: 100vh; overflow-x: hidden; padding-top: env(safe-area-inset-top); }
         .page { display: none; padding: 15px; padding-bottom: 120px; }
         .active { display: block; animation: slideUp 0.4s ease; }
+
+        /* Новый компактный заголовок над балансом */
+        .compact-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; padding: 0 5px; }
+        .ticker-group { display: flex; gap: 15px; }
+        .ticker { display: flex; flex-direction: column; }
+        .ticker span:first-child { font-size: 8px; font-weight: 800; color: var(--text); text-transform: uppercase; }
+        .ticker span:last-child { font-size: 12px; font-weight: 800; color: var(--green); }
+        
+        .sw-box { width: 44px; height: 24px; background: var(--btn-bg); border-radius: 20px; position: relative; cursor: pointer; border: 1px solid var(--border); }
+        .sw-box::after { content: ""; position: absolute; width: 20px; height: 20px; left: 2px; top: 2px; background: var(--sw-ball); border-radius: 50%; transition: 0.25s; }
+        .light .sw-box::after { transform: translateX(20px); }
 
         #edit-modal, #budget-modal { 
             display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; 
@@ -30,14 +41,6 @@
         }
         .modal-content { background: var(--card); border-radius: 28px; padding: 25px; border: 1px solid var(--border); width: 100%; max-width: 400px; }
 
-        .top-bar { display: flex; justify-content: space-between; align-items: center; padding: 10px 20px; background: var(--glass); backdrop-filter: blur(20px); border-bottom: 0.5px solid var(--border); }
-        .ticker { display: flex; flex-direction: column; }
-        .ticker span:first-child { font-size: 8px; font-weight: 800; color: var(--text); text-transform: uppercase; }
-        .ticker span:last-child { font-size: 12px; font-weight: 800; color: var(--green); }
-        .sw-box { width: 44px; height: 24px; background: var(--btn-bg); border-radius: 20px; position: relative; cursor: pointer; }
-        .sw-box::after { content: ""; position: absolute; width: 20px; height: 20px; left: 2px; top: 2px; background: var(--sw-ball); border-radius: 50%; transition: 0.25s; }
-        .light .sw-box::after { transform: translateX(20px); }
-        
         #chart-container { position: relative; height: 240px; margin: 10px 0; background: var(--card); border-radius: 28px; border: 1px solid var(--border); overflow: hidden; }
         #chart-slider { display: flex; transition: transform 0.4s cubic-bezier(0.2, 0.8, 0.2, 1); height: 100%; }
         .chart-slide { min-width: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; }
@@ -102,15 +105,15 @@
         <button class="note-in" style="margin-top:10px; background:none;" onclick="closeBudModal()">Отмена</button>
     </div></div>
 
-    <div class="top-bar" id="top-bar">
-        <div style="display:flex; gap:15px;">
-            <div class="ticker"><span>BTC</span><span id="btc-rate">$...</span></div>
-            <div class="ticker"><span>RUB</span><span id="usd-rate">...</span></div>
-        </div>
-        <div class="sw-box" onclick="document.body.classList.toggle('light');"></div>
-    </div>
-
     <div id="p-home" class="page active">
+        <div class="compact-header">
+            <div class="ticker-group">
+                <div class="ticker"><span>BTC</span><span id="btc-rate">$...</span></div>
+                <div class="ticker"><span>RUB</span><span id="usd-rate">...</span></div>
+            </div>
+            <div class="sw-box" onclick="document.body.classList.toggle('light');"></div>
+        </div>
+
         <div class="balance-card" onclick="toggleBlur()">
             <span class="bal-label">Баланс</span>
             <div class="bal-container">
@@ -187,8 +190,8 @@
             document.getElementById('p-'+p).classList.add('active');
             document.getElementById('n-'+p).classList.add('active');
             const nav = document.getElementById('main-nav');
-            if(p === 'home') { nav.classList.add('nav-home'); nav.classList.remove('nav-other'); document.getElementById('top-bar').style.display = 'flex'; }
-            else { nav.classList.remove('nav-home'); nav.classList.add('nav-other'); document.getElementById('top-bar').style.display = 'none'; }
+            if(p === 'home') { nav.classList.add('nav-home'); nav.classList.remove('nav-other'); }
+            else { nav.classList.remove('nav-home'); nav.classList.add('nav-other'); }
             updateUI();
         }
 
@@ -313,6 +316,7 @@
     </script>
 </body>
 </html>
+
 
 
 
