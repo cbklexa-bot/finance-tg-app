@@ -41,7 +41,7 @@
         .sw-box::after { content: ""; position: absolute; width: 20px; height: 20px; left: 2px; top: 2px; background: var(--sw-ball); border-radius: 50%; transition: 0.25s; }
         .light .sw-box::after { transform: translateX(20px); }
         
-        #chart-container { position: relative; height: 240px; margin: 10px 0; background: var(--card); border-radius: 28px; border: 1px solid var(--border); overflow: hidden; }
+        #chart-container { position: relative; height: 240px; margin: 10px 0; background: var(--card); border-radius: 28px; border: 1px solid var(--border); overflow: hidden; touch-action: pan-y; }
         #chart-slider { display: flex; transition: transform 0.4s cubic-bezier(0.2, 0.8, 0.2, 1); height: 100%; }
         .chart-slide { min-width: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; padding-top: 10px; }
         .dots { display: flex; justify-content: center; gap: 8px; margin-bottom: 20px; }
@@ -71,7 +71,6 @@
         .cat-item.active .cat-icon { border-color: var(--blue); background: var(--blue); }
         .cat-name { font-size: 10px; color: var(--text); font-weight: 600; margin-top: 6px; display: block; text-align: center; }
 
-        /* ОБНОВЛЕННЫЕ СТИЛИ ИСТОРИИ */
         .h-item { display: flex; justify-content: space-between; align-items: center; padding: 14px; background: var(--card); border-radius: 20px; margin-bottom: 10px; border: 1px solid var(--border); cursor: pointer; }
         .h-left { display: flex; align-items: center; gap: 12px; flex: 1; overflow: hidden; }
         .h-icon-box { font-size: 24px; min-width: 32px; text-align: center; }
@@ -204,6 +203,24 @@
             inc: [{n:'Зарплата', i:'💵'}, {n:'Инвест', i:'📈'}, {n:'Подарок', i:'🎁'}, {n:'Прочее', i:'📦'}]
         };
 
+        // ЛОГИКА СВАЙПОВ ДЛЯ ГРАФИКОВ
+        let touchStartX = 0;
+        const chartContainer = document.getElementById('chart-container');
+        
+        chartContainer.addEventListener('touchstart', e => {
+            touchStartX = e.changedTouches[0].screenX;
+        });
+
+        chartContainer.addEventListener('touchend', e => {
+            let touchEndX = e.changedTouches[0].screenX;
+            if (touchStartX - touchEndX > 50) { // Свайп влево
+                if (currentSlide < 2) { currentSlide++; drawCharts(); }
+            }
+            if (touchEndX - touchStartX > 50) { // Свайп вправо
+                if (currentSlide > 0) { currentSlide--; drawCharts(); }
+            }
+        });
+
         function toDateStr(date) { return date.toISOString().split('T')[0]; }
         function showLoad(show) { document.getElementById('loader').style.display = show ? 'block' : 'none'; }
 
@@ -304,7 +321,6 @@
             document.getElementById('total-bud-chart').setAttribute('stroke', tSpent > tLimit ? 'var(--red)' : 'var(--blue)');
         }
 
-        // ОБНОВЛЕННАЯ ФУНКЦИЯ ИСТОРИИ
         function renderHistory() {
             const h = document.getElementById('h-list-full');
             if (!h) return;
@@ -487,4 +503,5 @@
     </script>
 </body>
 </html>
+
 
