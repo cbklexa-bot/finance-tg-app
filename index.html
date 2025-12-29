@@ -83,10 +83,6 @@
         #loader { position: fixed; top: 0; left: 0; width: 100%; height: 2px; background: var(--blue); z-index: 3000; display: none; }
 
         @keyframes slideUp { from { opacity: 0; transform: translateY(15px); } to { opacity: 1; transform: translateY(0); } }
-
-        /* Секция чата с ИИ */
-        .ai-chat-btn { background: #6366f1; color: white; border: none; border-radius: 18px; padding: 12px; margin-top: 10px; width: 100%; font-weight: 800; cursor: pointer; }
-        #ai-response { margin-top: 10px; font-size: 13px; color: var(--text); background: var(--btn-bg); padding: 10px; border-radius: 12px; display: none; }
     </style>
 </head>
 <body>
@@ -132,8 +128,6 @@
             <input type="text" id="note" class="note-in" placeholder="Заметка...">
             <input type="date" id="date-picker" class="date-in">
             <button class="save-btn" onclick="save()">Добавить запись</button>
-            <button class="ai-chat-btn" onclick="askAI()">Спросить совет ИИ 🪄</button>
-            <div id="ai-response"></div>
         </div>
         <div class="cat-grid" id="cat-list"></div>
     </div>
@@ -164,8 +158,18 @@
         const { createClient } = supabase;
         const _supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
         
-        let userId = tg.initDataUnsafe?.user?.id?.toString() || localStorage.getItem('finance_anon_id') || ('user_' + Math.random().toString(36).substr(2, 9));
-        if (!localStorage.getItem('finance_anon_id')) localStorage.setItem('finance_anon_id', userId);
+        // --- ЗАЩИТА И ОПРЕДЕЛЕНИЕ ПОЛЬЗОВАТЕЛЯ ---
+        let userId = tg.initDataUnsafe?.user?.id?.toString();
+
+        if (!userId) {
+            // Если открыто не в телеграм, ищем локальный ID или создаем новый уникальный
+            userId = localStorage.getItem('finance_anon_id');
+            if (!userId) {
+                userId = 'user_' + Math.random().toString(36).substr(2, 9);
+                localStorage.setItem('finance_anon_id', userId);
+            }
+            console.log("Вход как аноним:", userId);
+        }
 
         let db = [];
         let mode = 'exp', currentCat = '🍎', currentSlide = 0, editingId = null;
@@ -179,54 +183,39 @@
         function toDateStr(date) { return date.toISOString().split('T')[0]; }
         function showLoad(show) { document.getElementById('loader').style.display = show ? 'block' : 'none'; }
 
-        // --- БЕЗОПАСНЫЙ ВЫЗОВ ИИ (Отредактировано для Cloudflare) ---
-        async function askAI() {
-            const note = document.getElementById('note').value;
-            const resDiv = document.getElementById('ai-response');
-            if (!note) { alert("Напишите вопрос в заметке!"); return; }
+        // --- СИНХРОНИЗАЦИЯ С ЗАЩИТОЙ ---
 
-            showLoad(true);
-            resDiv.style.display = 'block';
-            resDiv.innerText = "Думаю...";
-
-            try {
-                // Путь изменен на /chat, так как файл лежит в functions/chat.js
-                const response = await fetch('/chat', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ prompt: `Исходя из этого комментария: "${note}", дай короткий финансовый совет на 1 предложение.` })
-                });
-
-                const data = await response.json();
-                
-                if (data.error) {
-                    resDiv.innerText = "Ошибка: " + data.error;
-                } else if (data.choices && data.choices[0]) {
-                    resDiv.innerText = data.choices[0].message.content;
-                } else {
-                    resDiv.innerText = "Не удалось получить ответ от ИИ.";
-                }
-            } catch (e) {
-                resDiv.innerText = "Ошибка ИИ. Проверьте настройки в Cloudflare.";
-            } finally {
-                showLoad(false);
-            }
-        }
-
-        // --- ОСТАЛЬНАЯ ЛОГИКА ---
         async function syncFromCloud() {
+            // 1. Сначала показываем что есть в кеше именно для этого userId
             const local = localStorage.getItem('fin_cache_' + userId);
-            if (local) { db = JSON.parse(local); updateUI(); }
+            if (local) {
+                db = JSON.parse(local);
+                updateUI();
+            }
+
             showLoad(true);
             try {
-                const { data, error } = await _supabase.from('finance').select('data').eq('id', userId).maybeSingle();
+                const { data, error } = await _supabase
+                    .from('finance')
+                    .select('data')
+                    .eq('id', userId)
+                    .maybeSingle();
+
                 if (!error && data && data.data) {
                     db = data.data;
-                    db.sort((a, b) => b.d.localeCompare(a.d) || b.id - a.id);
+                    // Сортировка по дате и ID (времени)
+                    db.sort((a, b) => {
+                        if (b.d !== a.d) return b.d.localeCompare(a.d);
+                        return b.id - a.id;
+                    });
                     localStorage.setItem('fin_cache_' + userId, JSON.stringify(db));
                     updateUI();
+                } else if (!data) {
+                    // Если пользователя вообще нет в базе, обнуляем (важно для приватности)
+                    if (!local) db = [];
+                    updateUI();
                 }
-            } catch (e) {}
+            } catch (e) { console.error("Ошибка сети"); }
             showLoad(false);
         }
 
@@ -234,19 +223,65 @@
             localStorage.setItem('fin_cache_' + userId, JSON.stringify(db));
             showLoad(true);
             try {
-                await _supabase.from('finance').upsert({ id: userId, data: db, updated_at: new Date().toISOString() });
-            } catch (e) {}
+                await _supabase
+                    .from('finance')
+                    .upsert({ 
+                        id: userId, 
+                        data: db,
+                        updated_at: new Date().toISOString() 
+                    }, { onConflict: 'id' });
+            } catch (e) { console.error('Ошибка сохранения'); }
             showLoad(false);
         }
 
         async function save() {
             const s = document.getElementById('sum'), n = document.getElementById('note'), d = document.getElementById('date-picker');
             if(!s.value || s.value <= 0) return;
-            db.unshift({ id: Date.now(), t: mode, c: currentCat, s: parseFloat(s.value), n: n.value || 'Без описания', d: d.value || toDateStr(new Date()) });
+            
+            const newRecord = { 
+                id: Date.now(), 
+                t: mode, 
+                c: currentCat, 
+                s: parseFloat(s.value), 
+                n: n.value || 'Без описания', 
+                d: d.value || toDateStr(new Date()) 
+            };
+
+            db.unshift(newRecord);
             updateUI();
             await cloudSave();
+            
             s.value = ''; n.value = '';
             tg.HapticFeedback.notificationOccurred('success');
+        }
+
+        async function confirmEdit() {
+            const item = db.find(x => x.id === editingId);
+            if(item) {
+                item.s = parseFloat(document.getElementById('edit-sum').value);
+                item.n = document.getElementById('edit-note').value;
+                updateUI();
+                closeModal();
+                await cloudSave();
+            }
+        }
+
+        async function deleteTransaction() {
+            if(!confirm('Удалить запись?')) return;
+            db = db.filter(x => x.id !== editingId);
+            updateUI();
+            closeModal();
+            await cloudSave();
+        }
+
+        function toggleBlur() { 
+            const bal = document.getElementById('bal');
+            const eye = document.getElementById('eye-icon');
+            bal.classList.toggle('blurred');
+            eye.innerHTML = bal.classList.contains('blurred') 
+                ? '<path d="M17.94 17.94A10.07 10.07 0 0112 20c-7 0-11-8-11-8a18.45 18.45 0 015.06-5.94M9.9 4.24A9.12 9.12 0 0112 4c7 0 11 8 11 8a18.5 18.5 0 01-2.16 3.19m-6.72-1.07a3 3 0 11-4.24-4.24"></path><line x1="1" y1="1" x2="23" y2="23"></line>'
+                : '<path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle>';
+            tg.HapticFeedback.impactOccurred('light');
         }
 
         function updateUI() {
@@ -254,87 +289,108 @@
             document.getElementById('bal').innerText = total.toLocaleString() + ' ₽';
             renderCats();
             renderHistory();
-            if(document.getElementById('p-an').classList.contains('active')) drawCharts();
+            if(document.getElementById('p-an').classList.contains('active')) {
+                drawCharts();
+            }
         }
 
         function renderHistory() {
             const h = document.getElementById('h-list-full');
             if (!h) return;
-            h.innerHTML = db.map(i => `<div class="h-item" onclick="openEdit(${i.id})">
-                <div class="h-icon-box" style="color:${catColors[i.c] || 'var(--main)'}">${i.c}</div>
-                <div class="h-info">
-                    <div class="h-title-row"><span class="h-cat-name">${getCatName(i.c)}</span><span class="h-date">• ${i.d.split('-').slice(1).reverse().join('.')}</span></div>
-                    <span class="h-note">${i.n}</span>
-                </div>
-                <div class="h-amount" style="color:${i.t === 'exp' ? 'var(--red)' : 'var(--green)'}">${i.t === 'exp' ? '-' : '+'}${i.s.toLocaleString()} ₽</div>
-            </div>`).join('');
+            h.innerHTML = db.map(i => {
+                const p = i.d.split('-');
+                return `<div class="h-item" onclick="openEdit(${i.id})">
+                    <div class="h-icon-box" style="color:${catColors[i.c] || 'var(--main)'}">${i.c}</div>
+                    <div class="h-info">
+                        <div class="h-title-row"><span class="h-cat-name">${getCatName(i.c)}</span><span class="h-date">• ${p[2]}.${p[1]}</span></div>
+                        <span class="h-note">${i.n}</span>
+                    </div>
+                    <div class="h-amount" style="color:${i.t === 'exp' ? 'var(--red)' : 'var(--green)'}">${i.t === 'exp' ? '-' : '+'}${i.s.toLocaleString()} ₽</div>
+                </div>`
+            }).join('');
         }
 
-        function getCatName(icon) { return [...cats.exp, ...cats.inc].find(c => c.i === icon)?.n || 'Разное'; }
+        function getCatName(icon) {
+            const all = [...cats.exp, ...cats.inc];
+            const found = all.find(c => c.i === icon);
+            return found ? found.n : 'Разное';
+        }
+
         function openEdit(id) {
-            editingId = id; const item = db.find(x => x.id === id);
+            editingId = id;
+            const item = db.find(x => x.id === id);
+            if (!item) return;
             document.getElementById('edit-sum').value = item.s;
             document.getElementById('edit-note').value = item.n;
             document.getElementById('edit-modal').style.display = 'flex';
         }
-        function closeModal() { document.getElementById('edit-modal').style.display = 'none'; }
-        async function confirmEdit() {
-            const i = db.find(x => x.id === editingId);
-            if(i) { i.s = parseFloat(document.getElementById('edit-sum').value); i.n = document.getElementById('edit-note').value; updateUI(); closeModal(); await cloudSave(); }
-        }
-        async function deleteTransaction() {
-            if(!confirm('Удалить?')) return; db = db.filter(x => x.id !== editingId); updateUI(); closeModal(); await cloudSave();
-        }
 
-        function toggleBlur() {
-            const bal = document.getElementById('bal'), eye = document.getElementById('eye-icon');
-            bal.classList.toggle('blurred');
-            eye.innerHTML = bal.classList.contains('blurred') ? '<path d="M17.94 17.94A10.07 10.07 0 0112 20c-7 0-11-8-11-8a18.45 18.45 0 015.06-5.94M9.9 4.24A9.12 9.12 0 0112 4c7 0 11 8 11 8a18.5 18.5 0 01-2.16 3.19m-6.72-1.07a3 3 0 11-4.24-4.24"></path><line x1="1" y1="1" x2="23" y2="23"></line>' : '<path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle>';
-        }
+        function closeModal() { document.getElementById('edit-modal').style.display = 'none'; editingId = null; }
 
         function renderDayChart() {
-            const chart = document.getElementById('day-chart'), today = toDateStr(new Date());
-            const exp = db.filter(i => i.t === 'exp' && i.d === today), total = exp.reduce((a, b) => a + b.s, 0);
-            if (!total) { chart.innerHTML = '<circle cx="21" cy="21" r="15.9" fill="transparent" stroke="var(--border)" stroke-width="3"/><text x="21" y="21" text-anchor="middle" dy=".3em" fill="var(--text)" font-size="3">Нет трат</text>'; return; }
+            const chart = document.getElementById('day-chart');
+            const today = toDateStr(new Date());
+            const todayExp = db.filter(i => i.t === 'exp' && i.d === today);
+            const total = todayExp.reduce((a, b) => a + b.s, 0);
+            if (total === 0) {
+                chart.innerHTML = `<circle cx="21" cy="21" r="15.9" fill="transparent" stroke="var(--border)" stroke-width="3"/><text x="21" y="21" text-anchor="middle" dy=".3em" fill="var(--text)" font-size="3">Нет трат</text>`;
+                return;
+            }
+            const catSums = {};
+            todayExp.forEach(i => catSums[i.c] = (catSums[i.c] || 0) + i.s);
             let offset = 0, html = '';
-            const sums = {}; exp.forEach(i => sums[i.c] = (sums[i.c] || 0) + i.s);
-            Object.entries(sums).forEach(([cat, sum]) => {
-                const p = (sum / total) * 100;
-                html += `<circle cx="21" cy="21" r="15.9" fill="transparent" stroke="${catColors[cat] || 'var(--blue)'}" stroke-width="5" stroke-dasharray="${p} ${100 - p}" stroke-dashoffset="${-offset}" />`;
-                offset += p;
+            Object.entries(catSums).forEach(([cat, sum]) => {
+                const percent = (sum / total) * 100;
+                html += `<circle cx="21" cy="21" r="15.9" fill="transparent" stroke="${catColors[cat] || 'var(--blue)'}" stroke-width="5" stroke-dasharray="${percent} ${100 - percent}" stroke-dashoffset="${-offset}" />`;
+                offset += percent;
             });
-            chart.innerHTML = html + `<text x="21" y="21" text-anchor="middle" dy=".3em" fill="var(--main)" font-size="5" font-weight="900">${Math.round(total)}₽</text>`;
+            html += `<text x="21" y="21" text-anchor="middle" dy=".3em" fill="var(--main)" font-size="5" font-weight="900">${Math.round(total)}₽</text>`;
+            chart.innerHTML = html;
         }
 
         function renderWeekChart() {
-            const svg = document.getElementById('week-chart'), names = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'], sums = new Array(7).fill(0);
-            const now = new Date(), day = (now.getDay() + 6) % 7;
-            for(let i=0; i<7; i++) {
-                const d = new Date(now); d.setDate(now.getDate() - day + i);
-                sums[i] = db.filter(item => item.t === 'exp' && item.d === toDateStr(d)).reduce((a, b) => a + b.s, 0);
+            const svg = document.getElementById('week-chart');
+            const daysName = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'];
+            const weekSums = new Array(7).fill(0);
+            const now = new Date(), currentDayIdx = (now.getDay() + 6) % 7;
+            for(let i = 0; i < 7; i++) {
+                const d = new Date(now);
+                d.setDate(now.getDate() - currentDayIdx + i);
+                const ds = toDateStr(d);
+                weekSums[i] = db.filter(item => item.t === 'exp' && item.d === ds).reduce((a, b) => a + b.s, 0);
             }
-            const max = Math.max(...sums, 100) * 1.3;
-            svg.innerHTML = sums.map((v, i) => {
-                const h = (v/max)*100, x = 20+i*38, y = 130-h;
-                return `<text x="${x+12}" y="${y-8}" text-anchor="middle" fill="var(--main)" font-size="8">${v?Math.round(v):''}</text><rect x="${x}" y="${y}" width="24" height="${h}" rx="6" fill="${i===day?'var(--blue)':'var(--btn-bg)'}"/><text x="${x+12}" y="148" text-anchor="middle" fill="var(--text)" font-size="10">${names[i]}</text>`;
+            const max = Math.max(...weekSums, 100) * 1.3;
+            svg.innerHTML = weekSums.map((v, i) => {
+                const h = (v / max) * 100, x = 20 + i * 38, y = 130 - h;
+                return `<text x="${x + 12}" y="${y - 8}" text-anchor="middle" fill="var(--main)" font-size="8" font-weight="800">${v > 0 ? Math.round(v) : ''}</text>
+                        <rect x="${x}" y="${y}" width="24" height="${h}" rx="6" fill="${i === currentDayIdx ? 'var(--blue)' : 'var(--btn-bg)'}"/>
+                        <text x="${x + 12}" y="148" text-anchor="middle" fill="var(--text)" font-size="10">${daysName[i]}</text>`;
             }).join('');
         }
 
         function renderMonthChart() {
-            const svg = document.getElementById('month-chart'), points = [], now = new Date();
-            for(let i=5; i>=0; i--) {
-                let s = 0, l = "";
-                for(let j=0; j<5; j++) {
-                    const d = new Date(now); d.setDate(now.getDate() - (i*5+j));
-                    if(j===0) l = d.getDate()+'.'+(d.getMonth()+1);
-                    s += db.filter(x => x.t==='exp' && x.d===toDateStr(d)).reduce((a,b)=>a+b.s, 0);
+            const svg = document.getElementById('month-chart');
+            const pointsData = [], now = new Date();
+            for(let i = 5; i >= 0; i--) {
+                let chunkSum = 0, label = "";
+                for(let j = 0; j < 5; j++) {
+                    const d = new Date(now);
+                    d.setDate(now.getDate() - (i * 5 + j));
+                    const ds = toDateStr(d);
+                    if (j === 0) label = ds.split('-').slice(2).join('.'); 
+                    chunkSum += db.filter(item => item.t === 'exp' && item.d === ds).reduce((a, b) => a + b.s, 0);
                 }
-                points.push({l, v:s});
+                pointsData.push({ label, val: chunkSum });
             }
-            const max = Math.max(...points.map(p=>p.v), 100)*1.4;
-            const pts = points.map((p,i)=>({x: 30+i*48, y: 130-(p.v/max*100)}));
-            let path = `M ${pts[0].x} ${pts[0].y}`; for(let i=1; i<pts.length; i++) path += ` L ${pts[i].x} ${pts[i].y}`;
-            svg.innerHTML = `<path d="${path} L ${pts[5].x 130} L ${pts[0].x 130} Z" fill="rgba(10,132,255,0.2)"/><path d="${path}" fill="none" stroke="var(--blue)" stroke-width="3"/>` + pts.map((p,i)=>`<circle cx="${p.x}" cy="${p.y}" r="4" fill="var(--blue)"/><text x="${p.x}" y="148" text-anchor="middle" fill="var(--text)" font-size="9">${points[i].l}</text>`).join('');
+            const max = Math.max(...pointsData.map(p => p.val), 100) * 1.4;
+            const points = pointsData.map((p, i) => ({ x: 30 + i * 48, y: 130 - (p.val / max * 100) }));
+            let linePath = `M ${points[0].x} ${points[0].y}`;
+            for(let i = 1; i < points.length; i++) linePath += ` L ${points[i].x} ${points[i].y}`;
+            svg.innerHTML = `<defs><linearGradient id="mG" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="var(--blue)" stop-opacity="0.4"/><stop offset="100%" stop-color="var(--blue)" stop-opacity="0"/></linearGradient></defs>
+                <path d="${linePath} L ${points[5].x} 130 L ${points[0].x} 130 Z" fill="url(#mG)" />
+                <path d="${linePath}" fill="none" stroke="var(--blue)" stroke-width="3" stroke-linejoin="round"/>
+                ${points.map((p, i) => `<text x="${p.x}" y="${p.y - 12}" text-anchor="middle" fill="var(--main)" font-size="8" font-weight="800">${pointsData[i].val > 0 ? Math.round(pointsData[i].val) : ''}</text>
+                    <circle cx="${p.x}" cy="${p.y}" r="4" fill="var(--blue)"/><text x="${p.x}" y="148" text-anchor="middle" fill="var(--text)" font-size="9">${pointsData[i].label}</text>`).join('')}`;
         }
 
         function drawCharts() {
@@ -349,8 +405,7 @@
             document.querySelectorAll('.n-item').forEach(e => e.classList.remove('active'));
             document.getElementById('p-'+p).classList.add('active');
             document.getElementById('n-'+p).classList.add('active');
-            const topBar = document.getElementById('top-bar');
-            if (topBar) topBar.style.display = (p === 'home') ? 'flex' : 'none';
+            document.getElementById('top-bar').style.display = (p === 'home') ? 'flex' : 'none';
             updateUI();
         }
 
@@ -361,37 +416,44 @@
         }
 
         function renderCats() {
-            const c = document.getElementById('cat-list'); if (!c) return; c.innerHTML = '';
-            cats[mode].forEach(i => {
-                const d = document.createElement('div'); d.className = `cat-item ${currentCat === i.i ? 'active' : ''}`;
-                d.innerHTML = `<div class="cat-icon">${i.i}</div><span class="cat-name">${i.n}</span>`;
-                d.onclick = () => { currentCat = i.i; renderCats(); }; c.appendChild(d);
+            const container = document.getElementById('cat-list'); 
+            if (!container) return;
+            container.innerHTML = '';
+            cats[mode].forEach(c => {
+                const div = document.createElement('div');
+                div.className = `cat-item ${currentCat === c.i ? 'active' : ''}`;
+                div.innerHTML = `<div class="cat-icon">${c.i}</div><span class="cat-name">${c.n}</span>`;
+                div.onclick = () => { currentCat = c.i; renderCats(); };
+                container.appendChild(div);
             });
         }
 
         let sX = 0;
-        const chartCont = document.getElementById('chart-container');
-        if (chartCont) {
-            chartCont.ontouchstart = e => sX = e.touches[0].clientX;
-            chartCont.ontouchend = e => {
-                const d = sX - e.changedTouches[0].clientX;
-                if (Math.abs(d) > 50) { if (d > 0 && currentSlide < 2) currentSlide++; else if (d < 0 && currentSlide > 0) currentSlide--; drawCharts(); }
-            };
-        }
+        document.getElementById('chart-container').addEventListener('touchstart', e => sX = e.touches[0].clientX);
+        document.getElementById('chart-container').addEventListener('touchend', e => {
+            const d = sX - e.changedTouches[0].clientX;
+            if (Math.abs(d) > 50) {
+                if (d > 0 && currentSlide < 2) currentSlide++; else if (d < 0 && currentSlide > 0) currentSlide--;
+                drawCharts(); tg.HapticFeedback.impactOccurred('light');
+            }
+        });
 
         async function getRates() {
             try {
-                const b = await fetch('https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd');
-                const bd = await b.json(); document.getElementById('btc-rate').innerText = '$' + bd.bitcoin.usd.toLocaleString();
-                const r = await fetch('https://api.exchangerate-api.com/v4/latest/USD');
-                const rd = await r.json(); document.getElementById('usd-rate').innerText = rd.rates.RUB.toFixed(2) + '₽';
+                const btcR = await fetch('https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd');
+                const btcD = await btcR.json();
+                document.getElementById('btc-rate').innerText = '$' + btcD.bitcoin.usd.toLocaleString();
+                const rubR = await fetch('https://api.exchangerate-api.com/v4/latest/USD');
+                const rubD = await rubR.json();
+                document.getElementById('usd-rate').innerText = rubD.rates.RUB.toFixed(2) + '₽';
             } catch(e) {}
         }
 
         window.onload = () => { 
-            const dp = document.getElementById('date-picker');
-            if (dp) dp.valueAsDate = new Date();
-            tg.expand(); syncFromCloud(); getRates(); 
+            document.getElementById('date-picker').valueAsDate = new Date();
+            tg.expand();
+            syncFromCloud();
+            getRates(); 
         };
     </script>
 </body>
