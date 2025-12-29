@@ -51,9 +51,10 @@
 
         .balance-card { background: var(--grad); border-radius: 24px; padding: 25px 20px; margin-bottom: 15px; border: 1px solid var(--border); text-align: center; position: relative; cursor: pointer; }
         .bal-label { font-size: 11px; font-weight: 800; color: var(--text); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px; display: block; }
-        .bal-container { display: flex; align-items: center; justify-content: center; gap: 8px; }
+        .bal-container { display: flex; align-items: center; justify-content: center; gap: 12px; }
         .bal-amount { font-size: 38px; font-weight: 900; transition: filter 0.3s ease; }
         .bal-amount.blurred { filter: blur(12px); }
+        .eye-icon { width: 24px; height: 24px; stroke: var(--text); fill: none; stroke-width: 2; }
 
         .input-section { background: var(--card); border-radius: 24px; padding: 15px; border: 1px solid var(--border); margin-bottom: 15px; display: flex; flex-direction: column; gap: 10px; }
         .sum-in { width: 100%; background: transparent; border: none; color: var(--main); font-size: 40px; font-weight: 900; text-align: center; outline: none; }
@@ -115,6 +116,7 @@
             <span class="bal-label">Баланс</span>
             <div class="bal-container">
                 <div class="bal-amount" id="bal">0 ₽</div>
+                <svg class="eye-icon" viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
             </div>
         </div>
 
@@ -364,6 +366,7 @@
     </script>
 </body>
 </html>
+
 
 
 
