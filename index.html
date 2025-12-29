@@ -81,7 +81,17 @@
         .h-note { font-size: 12px; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
         .h-amount { font-weight: 900; font-size: 16px; white-space: nowrap; margin-left: 10px; }
 
-        .nav { position: fixed; bottom: 0; width: 100%; background: var(--glass); backdrop-filter: blur(30px); display: flex; border-top: 0.5px solid var(--border); padding-bottom: env(safe-area-inset-bottom, 15px); }
+        /* ПОЛНОСТЬЮ ПРОЗРАЧНЫЙ НИЖНИЙ БАР */
+        .nav { 
+            position: fixed; 
+            bottom: 0; 
+            width: 100%; 
+            background: transparent; /* Убрали фон */
+            display: flex; 
+            border-top: 1px solid var(--border); /* Оставили только тонкую полоску сверху */
+            padding-bottom: env(safe-area-inset-bottom, 15px); 
+            z-index: 1000;
+        }
         .n-item { flex: 1; text-align: center; padding: 12px 0; color: var(--text); font-size: 10px; font-weight: 700; text-transform: uppercase; }
         .n-item.active { color: var(--blue); }
         .n-item svg { width: 22px; height: 22px; display: block; margin: 0 auto 4px; stroke: currentColor; fill: none; stroke-width: 2.5; }
@@ -204,7 +214,6 @@
             inc: [{n:'Зарплата', i:'💵'}, {n:'Инвест', i:'📈'}, {n:'Подарок', i:'🎁'}, {n:'Прочее', i:'📦'}]
         };
 
-        // Свайпы
         let touchStartX = 0;
         const chartContainer = document.getElementById('chart-container');
         chartContainer.addEventListener('touchstart', e => { touchStartX = e.changedTouches[0].screenX; });
@@ -242,7 +251,6 @@
             showLoad(false);
         }
 
-        // --- БЮДЖЕТНАЯ ЛОГИКА ---
         function openBudModal(idx = null) {
             editingBudIdx = idx;
             const modal = document.getElementById('budget-modal');
@@ -332,7 +340,6 @@
             document.getElementById('total-bud-chart').setAttribute('stroke', getBudColor(totalPerc));
         }
 
-        // --- ОСТАЛЬНАЯ ЛОГИКА ---
         async function save() {
             const s = document.getElementById('sum'), n = document.getElementById('note'), d = document.getElementById('date-picker');
             if(!s.value || s.value <= 0) return;
@@ -358,16 +365,11 @@
             if (!h) return;
             h.innerHTML = db.map(i => {
                 const p = i.d.split('-');
-                const dateFormatted = `${p[2]}.${p[1]}`;
-                return `
-                    <div class="h-item" onclick="openEdit(${i.id})">
+                return `<div class="h-item" onclick="openEdit(${i.id})">
                         <div class="h-left">
                             <div class="h-icon-box" style="color:${catColors[i.c] || 'var(--main)'}">${i.c}</div>
                             <div class="h-details">
-                                <div class="h-title-row">
-                                    <span class="h-cat-name">${getCatName(i.c)}</span>
-                                    <span class="h-date">${dateFormatted}</span>
-                                </div>
+                                <div class="h-title-row"><span class="h-cat-name">${getCatName(i.c)}</span><span class="h-date">${p[2]}.${p[1]}</span></div>
                                 <span class="h-note">${i.n}</span>
                             </div>
                         </div>
@@ -535,6 +537,7 @@
     </script>
 </body>
 </html>
+
 
 
 
