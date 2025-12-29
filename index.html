@@ -33,26 +33,12 @@
         .sw-box::after { content: ""; position: absolute; width: 20px; height: 20px; left: 2px; top: 2px; background: var(--sw-ball); border-radius: 50%; transition: 0.25s; }
         .light .sw-box::after { transform: translateX(20px); }
 
-        #edit-modal, #budget-modal { 
-            display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; 
-            background: rgba(0,0,0,0.8); backdrop-filter: blur(10px); z-index: 2000; 
-            justify-content: center; align-items: center; padding: 20px; box-sizing: border-box;
-        }
-        .modal-content { background: var(--card); border-radius: 28px; padding: 25px; border: 1px solid var(--border); width: 100%; max-width: 400px; }
-
-        #chart-container { position: relative; height: 240px; margin: 10px 0; background: var(--card); border-radius: 28px; border: 1px solid var(--border); overflow: hidden; touch-action: pan-y; }
-        #chart-slider { display: flex; transition: transform 0.4s cubic-bezier(0.2, 0.8, 0.2, 1); height: 100%; }
-        .chart-slide { min-width: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; }
-        .dots { display: flex; justify-content: center; gap: 8px; margin-bottom: 20px; }
-        .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--border); transition: 0.3s; }
-        .dot.active { background: var(--blue); transform: scale(1.3); }
-
         .balance-card { background: var(--grad); border-radius: 24px; padding: 25px 20px; margin-bottom: 15px; border: 1px solid var(--border); text-align: center; position: relative; cursor: pointer; }
         .bal-label { font-size: 11px; font-weight: 800; color: var(--text); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px; display: block; }
-        .bal-container { display: flex; align-items: center; justify-content: center; gap: 8px; }
+        .bal-container { display: flex; align-items: center; justify-content: center; gap: 10px; }
         .bal-amount { font-size: 38px; font-weight: 900; transition: filter 0.3s ease; }
         .bal-amount.blurred { filter: blur(12px); }
-        .eye-icon { width: 20px; height: 20px; stroke: var(--text); fill: none; stroke-width: 2.5; }
+        .eye-icon { width: 24px; height: 24px; fill: var(--text); opacity: 0.7; }
 
         .input-section { background: var(--card); border-radius: 24px; padding: 15px; border: 1px solid var(--border); margin-bottom: 15px; display: flex; flex-direction: column; gap: 10px; }
         .sum-in { width: 100%; background: transparent; border: none; color: var(--main); font-size: 40px; font-weight: 900; text-align: center; outline: none; }
@@ -60,27 +46,32 @@
         .date-in { width: 100%; background: var(--btn-bg); border: none; border-radius: 12px; padding: 10px; color: var(--blue); font-size: 14px; font-weight: 700; text-align: center; box-sizing: border-box; outline: none; }
         .save-btn { background: var(--blue); color: white; border: none; border-radius: 18px; padding: 16px; font-size: 16px; font-weight: 800; width: 100%; cursor:pointer; }
         
-        /* ИКОНКИ КАТЕГОРИЙ (УМЕНЬШЕНЫ НА 10%) */
         .cat-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-top: 15px; }
         .cat-icon { width: 47px; height: 47px; background: var(--btn-bg); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 20px; border: 2px solid transparent; transition: 0.2s; margin: 0 auto; }
         .cat-item.active .cat-icon { border-color: var(--blue); background: var(--blue); }
         .cat-name { font-size: 9px; color: var(--text); font-weight: 600; margin-top: 5px; display: block; text-align: center; text-transform: uppercase; }
 
-        .h-item { display: flex; justify-content: space-between; align-items: center; padding: 14px; background: var(--card); border-radius: 20px; margin-bottom: 10px; border: 1px solid var(--border); }
-        .h-amount { font-weight: 900; font-size: 16px; }
-
-        .nav { position: fixed; bottom: 0; width: 100%; display: flex; padding-bottom: env(safe-area-inset-bottom, 15px); z-index: 1000; transition: 0.3s; }
-        .nav-home { background: transparent; border-top: none; }
-        .nav-other { background: var(--glass); backdrop-filter: blur(20px); border-top: 0.5px solid var(--border); }
-
-        .n-item { flex: 1; text-align: center; padding: 12px 0; color: var(--text); font-size: 10px; font-weight: 700; text-transform: uppercase; }
-        .n-item.active { color: var(--blue); }
-        .n-item svg { width: 22px; height: 22px; display: block; margin: 0 auto 4px; stroke: currentColor; fill: none; stroke-width: 2.5; }
-
         .total-budget-card { background: var(--card); border-radius: 28px; padding: 20px; border: 1px solid var(--border); margin-bottom: 20px; text-align: center; }
         .bud-progress-card { background: var(--card); border-radius: 20px; padding: 16px; margin-bottom: 10px; border: 1px solid var(--border); }
         .pg-bar { width: 100%; height: 8px; background: var(--btn-bg); border-radius: 10px; margin-top: 10px; overflow: hidden; }
         .pg-fill { height: 100%; transition: 0.5s; }
+
+        #chart-container { position: relative; height: 260px; margin: 10px 0; background: var(--card); border-radius: 28px; border: 1px solid var(--border); overflow: hidden; touch-action: pan-y; }
+        #chart-slider { display: flex; transition: transform 0.4s cubic-bezier(0.2, 0.8, 0.2, 1); height: 100%; }
+        .chart-slide { min-width: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; position: relative; }
+        .chart-title { position: absolute; top: 15px; font-size: 10px; font-weight: 800; color: var(--text); text-transform: uppercase; letter-spacing: 1px; }
+
+        .nav { position: fixed; bottom: 0; width: 100%; display: flex; padding-bottom: env(safe-area-inset-bottom, 15px); z-index: 1000; background: var(--glass); backdrop-filter: blur(20px); border-top: 0.5px solid var(--border); }
+        .n-item { flex: 1; text-align: center; padding: 12px 0; color: var(--text); font-size: 10px; font-weight: 700; text-transform: uppercase; }
+        .n-item.active { color: var(--blue); }
+        .n-item svg { width: 22px; height: 22px; display: block; margin: 0 auto 4px; stroke: currentColor; fill: none; stroke-width: 2.5; }
+
+        #edit-modal, #budget-modal { 
+            display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; 
+            background: rgba(0,0,0,0.8); backdrop-filter: blur(10px); z-index: 2000; 
+            justify-content: center; align-items: center; padding: 20px;
+        }
+        .modal-content { background: var(--card); border-radius: 28px; padding: 25px; border: 1px solid var(--border); width: 100%; max-width: 400px; }
 
         @keyframes slideUp { from { opacity: 0; transform: translateY(15px); } to { opacity: 1; transform: translateY(0); } }
     </style>
@@ -98,9 +89,9 @@
 
     <div id="budget-modal"><div class="modal-content">
         <h3 id="bud-modal-title" style="text-align:center;">Лимит</h3>
-        <input type="text" id="new-bud-name" class="note-in" placeholder="Название">
-        <input type="number" id="new-bud-val" class="note-in" style="margin-top:10px;" placeholder="Сумма">
-        <button id="bud-save-btn" class="save-btn" style="margin-top:20px;" onclick="addBudget()">Сохранить</button>
+        <input type="text" id="new-bud-name" class="note-in" placeholder="Название (напр. Продукты)">
+        <input type="number" id="new-bud-val" class="note-in" style="margin-top:10px;" placeholder="Сумма лимита">
+        <button class="save-btn" style="margin-top:20px;" onclick="addBudget()">Сохранить</button>
         <button id="bud-del-btn" class="save-btn" style="background:var(--red); display:none; margin-top:10px;" onclick="deleteBudgetReal()">Удалить</button>
         <button class="note-in" style="margin-top:10px; background:none;" onclick="closeBudModal()">Отмена</button>
     </div></div>
@@ -118,13 +109,18 @@
             <span class="bal-label">Баланс</span>
             <div class="bal-container">
                 <div class="bal-amount" id="bal">0 ₽</div>
-                <svg class="eye-icon" viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+                <svg class="eye-icon" viewBox="0 0 24 24" id="eye-icon">
+                    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                    <circle cx="12" cy="12" r="3"></circle>
+                </svg>
             </div>
         </div>
+
         <div style="display:flex; gap:8px; background:var(--btn-bg); padding:4px; border-radius:12px; margin-bottom:15px;">
             <div id="btn-exp" style="flex:1; text-align:center; padding:10px; border-radius:10px; font-size:12px; font-weight:800; cursor:pointer; background:var(--blue);" onclick="setMode('exp')">Расход</div>
             <div id="btn-inc" style="flex:1; text-align:center; padding:10px; border-radius:10px; font-size:12px; font-weight:800; cursor:pointer;" onclick="setMode('inc')">Доход</div>
         </div>
+
         <div class="input-section">
             <input type="number" id="sum" class="sum-in" placeholder="0">
             <input type="text" id="note" class="note-in" placeholder="Заметка...">
@@ -136,11 +132,13 @@
 
     <div id="p-an" class="page">
         <div id="chart-container"><div id="chart-slider">
-            <div class="chart-slide"><svg width="150" height="150" viewBox="0 0 42 42" id="day-chart"></svg></div>
-            <div class="chart-slide"><svg width="300" height="160" id="week-chart"></svg></div>
-            <div class="chart-slide"><svg width="300" height="160" id="month-chart"></svg></div>
+            <div class="chart-slide"><span class="chart-title">Сегодня</span><svg width="200" height="200" viewBox="0 0 42 42" id="day-chart"></svg></div>
+            <div class="chart-slide"><span class="chart-title">Неделя</span><svg width="320" height="180" id="week-chart"></svg></div>
+            <div class="chart-slide"><span class="chart-title">Месяц</span><svg width="320" height="180" id="month-chart"></svg></div>
         </div></div>
-        <div class="dots"><div class="dot active"></div><div class="dot"></div><div class="dot"></div></div>
+        <div style="display:flex; justify-content:center; gap:8px; margin-bottom:20px;">
+            <div class="dot active"></div><div class="dot" style="width:6px; height:6px; border-radius:50%; background:var(--border);"></div><div class="dot" style="width:6px; height:6px; border-radius:50%; background:var(--border);"></div>
+        </div>
         <div id="h-list-full"></div>
     </div>
 
@@ -162,7 +160,7 @@
         <div id="budget-list"></div>
     </div>
 
-    <nav class="nav nav-home" id="main-nav">
+    <nav class="nav">
         <div class="n-item active" id="n-home" onclick="go('home')"><svg viewBox="0 0 24 24"><path d="M3 9.5L12 3l9 6.5V20a1 1 0 01-1 1h-5v-7h-4v7H4a1 1 0 01-1-1V9.5z"/></svg>Главная</div>
         <div class="n-item" id="n-an" onclick="go('an')"><svg viewBox="0 0 24 24"><path d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>История</div>
         <div class="n-item" id="n-bud" onclick="go('bud')"><svg viewBox="0 0 24 24"><path d="M9 7h6m-6 4h6m-6 4h6M5 21h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v14a2 2 0 002 2z"/></svg>Бюджет</div>
@@ -176,11 +174,11 @@
         let userId = tg.initDataUnsafe?.user?.id?.toString() || 'user_demo';
         let db = [];
         let budgets = JSON.parse(localStorage.getItem('fin_budgets_' + userId)) || [];
-        let mode = 'exp', currentCat = '🍎', currentSlide = 0, editingId = null, editingBudIdx = null, touchStartX = 0;
+        let mode = 'exp', currentCat = '🛒', currentSlide = 0, touchStartX = 0, editingBudIdx = null, isBlurred = false;
 
-        const catColors = { '🍎':'#ff453a', '🚗':'#ff9f0a', '🏠':'#30d158', '🛍️':'#0a84ff', '💊':'#bf5af2', '🎁':'#ff375f', '🎭':'#64d2ff', '📦':'#a1a1aa', '💵':'#30d158', '📈':'#0a84ff' };
+        const catColors = { '🛒':'#ff453a', '🚗':'#ff9f0a', '🏠':'#30d158', '🛍️':'#0a84ff', '💊':'#bf5af2', '🎁':'#ff375f', '🎭':'#64d2ff', '📦':'#a1a1aa', '💵':'#30d158', '📈':'#0a84ff' };
         const cats = {
-            exp: [{n:'Еда', i:'🍎'}, {n:'Авто', i:'🚗'}, {n:'Жилье', i:'🏠'}, {n:'Шопинг', i:'🛍️'}, {n:'Аптека', i:'💊'}, {n:'Подарки', i:'🎁'}, {n:'Отдых', i:'🎭'}, {n:'Прочее', i:'📦'}],
+            exp: [{n:'Продукты', i:'🛒'}, {n:'Авто', i:'🚗'}, {n:'Жилье', i:'🏠'}, {n:'Шопинг', i:'🛍️'}, {n:'Аптека', i:'💊'}, {n:'Подарки', i:'🎁'}, {n:'Отдых', i:'🎭'}, {n:'Прочее', i:'📦'}],
             inc: [{n:'Зарплата', i:'💵'}, {n:'Инвест', i:'📈'}, {n:'Подарок', i:'🎁'}, {n:'Прочее', i:'📦'}]
         };
 
@@ -189,21 +187,8 @@
             document.querySelectorAll('.n-item').forEach(e => e.classList.remove('active'));
             document.getElementById('p-'+p).classList.add('active');
             document.getElementById('n-'+p).classList.add('active');
-            const nav = document.getElementById('main-nav');
-            if(p === 'home') { nav.classList.add('nav-home'); nav.classList.remove('nav-other'); }
-            else { nav.classList.remove('nav-home'); nav.classList.add('nav-other'); }
             updateUI();
         }
-
-        // ЛОГИКА СВАЙПА ГРАФИКОВ
-        const sliderContainer = document.getElementById('chart-container');
-        sliderContainer.addEventListener('touchstart', e => { touchStartX = e.changedTouches[0].screenX; }, false);
-        sliderContainer.addEventListener('touchend', e => {
-            let diff = touchStartX - e.changedTouches[0].screenX;
-            if (diff > 50 && currentSlide < 2) currentSlide++;
-            else if (diff < -50 && currentSlide > 0) currentSlide--;
-            drawCharts();
-        }, false);
 
         async function syncFromCloud() {
             const local = localStorage.getItem('fin_cache_' + userId);
@@ -225,6 +210,99 @@
             if(document.getElementById('p-an').classList.contains('active')) drawCharts();
         }
 
+        function toggleBlur() { 
+            isBlurred = !isBlurred;
+            document.getElementById('bal').classList.toggle('blurred', isBlurred);
+            document.getElementById('eye-icon').innerHTML = isBlurred 
+                ? '<path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"></path><line x1="1" y1="1" x2="23" y2="23"></line>' 
+                : '<path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle>';
+            tg.HapticFeedback.impactOccurred('light'); 
+        }
+
+        // Остальные функции отрисовки (Day, Week, Month charts, Budget и т.д.)
+        function renderDayChart() {
+            const chart = document.getElementById('day-chart');
+            const today = new Date().toISOString().split('T')[0];
+            const todayExp = db.filter(i => i.t === 'exp' && i.d === today);
+            const total = todayExp.reduce((a, b) => a + b.s, 0);
+            if (total === 0) { chart.innerHTML = `<circle cx="21" cy="21" r="15.9" fill="transparent" stroke="var(--border)" stroke-width="3"/><text x="21" y="21" text-anchor="middle" dy=".3em" fill="var(--text)" font-size="3">0 ₽</text>`; return; }
+            const catSums = {}; todayExp.forEach(i => catSums[i.c] = (catSums[i.c] || 0) + i.s);
+            let offset = 0, html = '';
+            Object.entries(catSums).forEach(([cat, sum]) => {
+                const percent = (sum / total) * 100;
+                html += `<circle cx="21" cy="21" r="15.9" fill="transparent" stroke="${catColors[cat] || 'var(--blue)'}" stroke-width="5" stroke-dasharray="${percent} ${100 - percent}" stroke-dashoffset="${-offset}" />`;
+                offset += percent;
+            });
+            html += `<text x="21" y="21" text-anchor="middle" dy=".3em" fill="var(--main)" font-size="5" font-weight="900">${Math.round(total)} ₽</text>`;
+            chart.innerHTML = html;
+        }
+
+        function renderWeekChart() {
+            const svg = document.getElementById('week-chart');
+            const days = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'];
+            const weekSums = new Array(7).fill(0);
+            const now = new Date();
+            const currentDayIdx = now.getDay() === 0 ? 6 : now.getDay() - 1;
+            const monday = new Date(now);
+            monday.setDate(now.getDate() - currentDayIdx);
+            for(let i=0; i<7; i++) {
+                const d = new Date(monday); d.setDate(monday.getDate() + i);
+                const ds = d.toISOString().split('T')[0];
+                weekSums[i] = db.filter(item => item.t === 'exp' && item.d === ds).reduce((a, b) => a + b.s, 0);
+            }
+            const max = Math.max(...weekSums, 1000) * 1.3;
+            svg.innerHTML = weekSums.map((v, i) => {
+                const h = (v/max)*120; const x = 30 + i*40; const y = 140-h;
+                return `<text x="${x+10}" y="${y-8}" text-anchor="middle" fill="var(--main)" font-size="7" font-weight="800">${v > 0 ? Math.round(v) : ''}</text>
+                        <rect x="${x}" y="${y}" width="20" height="${h}" rx="6" fill="${i === currentDayIdx ? 'var(--blue)' : 'var(--btn-bg)'}"/>
+                        <text x="${x+10}" y="160" text-anchor="middle" fill="var(--text)" font-size="9" font-weight="800">${days[i]}</text>`;
+            }).join('');
+        }
+
+        function renderMonthChart() {
+            const svg = document.getElementById('month-chart');
+            const pointsCount = 6;
+            const sums = new Array(pointsCount).fill(0);
+            for(let i=0; i<pointsCount; i++) {
+                sums[i] = db.filter(item => item.t === 'exp' && (new Date().getDate() - new Date(item.d).getDate() <= (i+1)*5)).reduce((a, b) => a + b.s, 0);
+            }
+            const max = Math.max(...sums, 1000) * 1.4;
+            const points = sums.map((v, i) => ({x: 40 + i*50, y: 140 - (v/max)*100}));
+            const pathData = points.map(p => `${p.x},${p.y}`).join(' ');
+            svg.innerHTML = `<polyline points="${pathData}" fill="none" stroke="var(--blue)" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" />
+                ${points.map((p, i) => `<circle cx="${p.x}" cy="${p.y}" r="3.5" fill="var(--bg)" stroke="var(--blue)" stroke-width="2"/>
+                <text x="${p.x}" y="${p.y-12}" text-anchor="middle" fill="var(--main)" font-size="8" font-weight="900">${Math.round(sums[i])}</text>`).join('')}`;
+        }
+
+        function drawCharts() {
+            const slider = document.getElementById('chart-slider');
+            slider.style.transform = `translateX(-${currentSlide * 100}%)`;
+            if(currentSlide === 0) renderDayChart();
+            if(currentSlide === 1) renderWeekChart();
+            if(currentSlide === 2) renderMonthChart();
+        }
+
+        function renderBudget() {
+            const list = document.getElementById('budget-list');
+            let tLimit = 0, tSpent = 0;
+            list.innerHTML = budgets.map((b, i) => {
+                const spent = db.filter(t => t.t === 'exp' && (t.n.toLowerCase().includes(b.name.toLowerCase()))).reduce((a,c)=>a+c.s, 0);
+                tLimit += b.limit; tSpent += spent; 
+                const perc = Math.min((spent/b.limit)*100, 100);
+                return `<div class="bud-progress-card" onclick="openBudModal(${i})"><div style="display:flex; justify-content:space-between; font-size:14px;"><b>${b.name}</b><span>${spent.toLocaleString()} / ${b.limit.toLocaleString()} ₽</span></div><div class="pg-bar"><div class="pg-fill" style="width:${perc}%; background:${perc > 90 ? 'var(--red)' : 'var(--blue)'}"></div></div></div>`;
+            }).join('');
+            document.getElementById('total-bud-limit').innerText = tLimit.toLocaleString() + ' ₽';
+            document.getElementById('total-bud-spent').innerText = tSpent.toLocaleString() + ' ₽';
+            const totalPerc = tLimit > 0 ? Math.round((tSpent/tLimit)*100) : 0;
+            document.getElementById('total-bud-perc').innerText = totalPerc + '%';
+            document.getElementById('total-bud-chart').style.strokeDasharray = `${Math.min(totalPerc, 100)} 100`;
+        }
+
+        function renderCats() {
+            const container = document.getElementById('cat-list');
+            container.innerHTML = cats[mode].map(c => `<div class="cat-item ${currentCat === c.i ? 'active' : ''}" onclick="currentCat='${c.i}'; renderCats();"><div class="cat-icon">${c.i}</div><span class="cat-name">${c.n}</span></div>`).join('');
+        }
+
         async function save() {
             const s = document.getElementById('sum'), n = document.getElementById('note');
             if(!s.value) return;
@@ -235,13 +313,7 @@
 
         function renderHistory() {
             const h = document.getElementById('h-list-full');
-            h.innerHTML = db.map(i => `<div class="h-item" onclick="openEdit(${i.id})"><div style="display:flex; align-items:center; gap:10px;"><span style="font-size:20px;">${i.c}</span><div><b>${getCatName(i.c)}</b><br><small style="color:var(--text)">${i.d}</small></div></div><div class="h-amount" style="color:${i.t==='exp'?'var(--red)':'var(--green)'}">${i.s.toLocaleString()} ₽</div></div>`).join('');
-        }
-
-        function getCatName(icon) {
-            const all = [...cats.exp, ...cats.inc];
-            const found = all.find(c => c.i === icon);
-            return found ? found.n : 'Прочее';
+            h.innerHTML = db.map(i => `<div class="h-item" style="display:flex; justify-content:space-between; align-items:center; padding:14px; background:var(--card); border-radius:20px; margin-bottom:10px; border:1px solid var(--border);" onclick="openEdit(${i.id})"><div><span style="font-size:18px; margin-right:8px;">${i.c}</span><b>${i.n}</b><br><small style="color:var(--text)">${i.d}</small></div><div style="font-weight:900; color:${i.t==='exp'?'var(--red)':'var(--green)'}">${i.s.toLocaleString()} ₽</div></div>`).join('');
         }
 
         function openEdit(id) { editingId = id; const item = db.find(x => x.id === id); document.getElementById('edit-sum').value = item.s; document.getElementById('edit-note').value = item.n; document.getElementById('edit-modal').style.display = 'flex'; }
@@ -254,64 +326,7 @@
         function addBudget() { const n = document.getElementById('new-bud-name').value, v = parseFloat(document.getElementById('new-bud-val').value); if(editingBudIdx !== null) budgets[editingBudIdx] = {name:n, limit:v}; else budgets.push({name:n, limit:v}); closeBudModal(); updateUI(); cloudSave(); }
         function deleteBudgetReal() { budgets.splice(editingBudIdx, 1); closeBudModal(); updateUI(); cloudSave(); }
 
-        function renderBudget() {
-            const list = document.getElementById('budget-list'); let tLimit = 0, tSpent = 0;
-            list.innerHTML = budgets.map((b, i) => {
-                const spent = db.filter(t => t.t === 'exp' && (getCatName(t.c) === b.name || t.c === b.name)).reduce((a,c)=>a+c.s, 0);
-                tLimit += b.limit; tSpent += spent; const perc = Math.min((spent/b.limit)*100, 100);
-                return `<div class="bud-progress-card" onclick="openBudModal(${i})"><div style="display:flex; justify-content:space-between; font-size:14px;"><b>${b.name}</b><span>${spent.toLocaleString()} / ${b.limit.toLocaleString()} ₽</span></div><div class="pg-bar"><div class="pg-fill" style="width:${perc}%; background:${perc > 90 ? 'var(--red)' : 'var(--blue)'}"></div></div></div>`;
-            }).join('');
-            document.getElementById('total-bud-limit').innerText = tLimit.toLocaleString() + ' ₽';
-            document.getElementById('total-bud-spent').innerText = tSpent.toLocaleString() + ' ₽';
-            const totalPerc = tLimit > 0 ? Math.round((tSpent/tLimit)*100) : 0;
-            document.getElementById('total-bud-perc').innerText = totalPerc + '%';
-            document.getElementById('total-bud-chart').style.strokeDasharray = `${Math.min(totalPerc, 100)} 100`;
-        }
-
-        function drawCharts() {
-            const slider = document.getElementById('chart-slider');
-            if(slider) slider.style.transform = `translateX(-${currentSlide * 100}%)`;
-            document.querySelectorAll('.dot').forEach((d, i) => d.classList.toggle('active', i === currentSlide));
-            renderDayChart(); renderWeekChart(); renderMonthChart();
-        }
-
-        function renderDayChart() {
-            const chart = document.getElementById('day-chart');
-            const today = new Date().toISOString().split('T')[0];
-            const todayExp = db.filter(i => i.t === 'exp' && i.d === today);
-            const total = todayExp.reduce((a, b) => a + b.s, 0);
-            if (total === 0) { chart.innerHTML = `<circle cx="21" cy="21" r="15.9" fill="transparent" stroke="var(--border)" stroke-width="3"/><text x="21" y="21" text-anchor="middle" dy=".3em" fill="var(--text)" font-size="3">0₽</text>`; return; }
-            const catSums = {}; todayExp.forEach(i => catSums[i.c] = (catSums[i.c] || 0) + i.s);
-            let offset = 0, html = '';
-            Object.entries(catSums).forEach(([cat, sum]) => {
-                const percent = (sum / total) * 100;
-                html += `<circle cx="21" cy="21" r="15.9" fill="transparent" stroke="${catColors[cat] || 'var(--blue)'}" stroke-width="5" stroke-dasharray="${percent} ${100 - percent}" stroke-dashoffset="${-offset}" />`;
-                offset += percent;
-            });
-            html += `<text x="21" y="21" text-anchor="middle" dy=".3em" fill="var(--main)" font-size="5" font-weight="900">${Math.round(total)}</text>`;
-            chart.innerHTML = html;
-        }
-
-        function renderWeekChart() {
-            const svg = document.getElementById('week-chart'); const weekSums = new Array(7).fill(0);
-            for(let i=0; i<7; i++) {
-                const d = new Date(); d.setDate(d.getDate() - i); const ds = d.toISOString().split('T')[0];
-                weekSums[6-i] = db.filter(item => item.t === 'exp' && item.d === ds).reduce((a, b) => a + b.s, 0);
-            }
-            const max = Math.max(...weekSums, 100) * 1.2;
-            svg.innerHTML = weekSums.map((v, i) => { const h = (v/max)*100, x = 20 + i*40, y = 130-h; return `<rect x="${x}" y="${y}" width="20" height="${h}" rx="4" fill="var(--blue)"/><text x="${x+10}" y="150" text-anchor="middle" fill="var(--text)" font-size="8">${i+1}</text>`; }).join('');
-        }
-
-        function renderMonthChart() {
-            const svg = document.getElementById('month-chart'); const monthSums = new Array(4).fill(0);
-            for(let i=0; i<4; i++) { monthSums[i] = db.filter(item => item.t === 'exp' && (new Date().getDate() - new Date(item.d).getDate() <= (i+1)*7)).reduce((a, b) => a + b.s, 0); }
-            const max = Math.max(...monthSums, 100) * 1.2; let points = monthSums.map((v, i) => `${30 + i*80},${130 - (v/max)*100}`).join(' ');
-            svg.innerHTML = `<polyline points="${points}" fill="none" stroke="var(--blue)" stroke-width="3" />`;
-        }
-
         function setMode(m) { mode = m; currentCat = cats[m][0].i; renderCats(); document.getElementById('btn-exp').style.background = m === 'exp' ? 'var(--blue)' : 'transparent'; document.getElementById('btn-inc').style.background = m === 'inc' ? 'var(--blue)' : 'transparent'; }
-        function renderCats() { const container = document.getElementById('cat-list'); container.innerHTML = cats[mode].map(c => `<div class="cat-item ${currentCat === c.i ? 'active' : ''}" onclick="currentCat='${c.i}'; renderCats();"><div class="cat-icon">${c.i}</div><span class="cat-name">${c.n}</span></div>`).join(''); }
-        function toggleBlur() { document.getElementById('bal').classList.toggle('blurred'); tg.HapticFeedback.impactOccurred('light'); }
 
         async function getRates() {
             try {
@@ -326,6 +341,7 @@
     </script>
 </body>
 </html>
+
 
 
 
