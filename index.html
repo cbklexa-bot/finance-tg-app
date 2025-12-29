@@ -23,7 +23,7 @@
         .page { display: none; padding: 15px; padding-bottom: 120px; }
         .active { display: block; animation: slideUp 0.4s ease; }
 
-        #edit-modal { 
+        #edit-modal, #budget-modal { 
             display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; 
             background: rgba(0,0,0,0.8); backdrop-filter: blur(10px); z-index: 2000; 
             justify-content: center; align-items: center; padding: 20px; box-sizing: border-box;
@@ -61,19 +61,26 @@
         .save-btn { background: var(--blue); color: white; border: none; border-radius: 18px; padding: 16px; font-size: 16px; font-weight: 800; width: 100%; cursor:pointer; }
         .del-btn { background: var(--red); color: white; border: none; border-radius: 18px; padding: 12px; font-size: 14px; font-weight: 700; width: 100%; margin-top: 10px; cursor:pointer; }
         
+        .total-budget-card { background: var(--card); border-radius: 28px; padding: 20px; border: 1px solid var(--border); margin-bottom: 20px; text-align: center; }
+        .bud-progress-card { background: var(--card); border-radius: 20px; padding: 16px; margin-bottom: 10px; border: 1px solid var(--border); }
+        .pg-bar { width: 100%; height: 8px; background: var(--btn-bg); border-radius: 10px; margin-top: 10px; overflow: hidden; }
+        .pg-fill { height: 100%; background: var(--blue); transition: 0.5s; }
+
         .cat-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-top: 20px; }
         .cat-icon { width: 52px; height: 52px; background: var(--btn-bg); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 22px; border: 2px solid transparent; transition: 0.2s; margin: 0 auto; }
         .cat-item.active .cat-icon { border-color: var(--blue); background: var(--blue); }
         .cat-name { font-size: 10px; color: var(--text); font-weight: 600; margin-top: 6px; display: block; text-align: center; }
 
+        /* ОБНОВЛЕННЫЕ СТИЛИ ИСТОРИИ */
         .h-item { display: flex; justify-content: space-between; align-items: center; padding: 14px; background: var(--card); border-radius: 20px; margin-bottom: 10px; border: 1px solid var(--border); cursor: pointer; }
-        .h-icon-box { width: 44px; height: 44px; background: var(--btn-bg); border-radius: 14px; display: flex; align-items: center; justify-content: center; font-size: 22px; flex-shrink: 0; }
-        .h-info { display: flex; flex-direction: column; flex-grow: 1; margin-left: 12px; overflow: hidden; }
-        .h-title-row { display: flex; align-items: center; gap: 6px; }
-        .h-cat-name { font-weight: 800; font-size: 14px; color: var(--main); }
-        .h-date { color: var(--text); font-size: 10px; font-weight: 600; }
-        .h-note { color: var(--text); font-size: 12px; white-space: nowrap; text-overflow: ellipsis; overflow: hidden; margin-top: 2px; }
-        .h-amount { font-weight: 900; font-size: 16px; margin-left: 10px; white-space: nowrap; }
+        .h-left { display: flex; align-items: center; gap: 12px; flex: 1; overflow: hidden; }
+        .h-icon-box { font-size: 24px; min-width: 32px; text-align: center; }
+        .h-details { display: flex; flex-direction: column; gap: 2px; overflow: hidden; }
+        .h-title-row { display: flex; align-items: center; gap: 8px; }
+        .h-cat-name { font-weight: 800; font-size: 15px; color: var(--main); }
+        .h-date { font-size: 11px; color: var(--text); font-weight: 600; }
+        .h-note { font-size: 12px; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .h-amount { font-weight: 900; font-size: 16px; white-space: nowrap; margin-left: 10px; }
 
         .nav { position: fixed; bottom: 0; width: 100%; background: var(--glass); backdrop-filter: blur(30px); display: flex; border-top: 0.5px solid var(--border); padding-bottom: env(safe-area-inset-bottom, 15px); }
         .n-item { flex: 1; text-align: center; padding: 12px 0; color: var(--text); font-size: 10px; font-weight: 700; text-transform: uppercase; }
@@ -81,7 +88,6 @@
         .n-item svg { width: 22px; height: 22px; display: block; margin: 0 auto 4px; stroke: currentColor; fill: none; stroke-width: 2.5; }
         
         #loader { position: fixed; top: 0; left: 0; width: 100%; height: 2px; background: var(--blue); z-index: 3000; display: none; }
-
         @keyframes slideUp { from { opacity: 0; transform: translateY(15px); } to { opacity: 1; transform: translateY(0); } }
     </style>
 </head>
@@ -100,6 +106,16 @@
         </div>
     </div>
 
+    <div id="budget-modal">
+        <div class="modal-content">
+            <h3 style="margin-top:0; text-align:center;">Новый лимит</h3>
+            <input type="text" id="new-bud-name" class="note-in" placeholder="Название (например: Продукты)">
+            <input type="number" id="new-bud-val" class="note-in" style="margin-top:10px;" placeholder="Сумма лимита">
+            <button class="save-btn" style="margin-top:20px;" onclick="addBudget()">Создать</button>
+            <button class="note-in" style="margin-top:10px; background:none; color:var(--text);" onclick="closeBudModal()">Отмена</button>
+        </div>
+    </div>
+
     <div class="top-bar" id="top-bar">
         <div style="display:flex; gap:15px;">
             <div class="ticker"><span>BTC</span><span id="btc-rate">$...</span></div>
@@ -112,15 +128,12 @@
         <div class="balance-card" onclick="toggleBlur()">
             <div class="bal-container">
                 <div class="bal-amount" id="bal">0 ₽</div>
-                <svg id="eye-icon" class="eye-icon" viewBox="0 0 24 24">
-                    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
-                    <circle cx="12" cy="12" r="3"></circle>
-                </svg>
+                <svg id="eye-icon" class="eye-icon" viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
             </div>
         </div>
 
         <div style="display:flex; gap:8px; background:var(--btn-bg); padding:4px; border-radius:12px; margin-bottom:15px;">
-            <div id="btn-exp" style="flex:1; text-align:center; padding:10px; border-radius:10px; font-size:12px; font-weight:800; cursor:pointer;" onclick="setMode('exp')">Расход</div>
+            <div id="btn-exp" style="flex:1; text-align:center; padding:10px; border-radius:10px; font-size:12px; font-weight:800; cursor:pointer; background:var(--blue);" onclick="setMode('exp')">Расход</div>
             <div id="btn-inc" style="flex:1; text-align:center; padding:10px; border-radius:10px; font-size:12px; font-weight:800; cursor:pointer;" onclick="setMode('inc')">Доход</div>
         </div>
         <div class="input-section">
@@ -144,144 +157,114 @@
         <div id="h-list-full"></div>
     </div>
 
+    <div id="p-bud" class="page">
+        <h2 style="margin: 0 0 20px 0;">Бюджет на месяц</h2>
+        <div class="total-budget-card">
+            <div style="position:relative; width:120px; height:120px; margin: 0 auto 15px;">
+                <svg width="120" height="120" viewBox="0 0 42 42">
+                    <circle cx="21" cy="21" r="15.9" fill="transparent" stroke="var(--btn-bg)" stroke-width="3"></circle>
+                    <circle id="total-bud-chart" cx="21" cy="21" r="15.9" fill="transparent" stroke="var(--blue)" stroke-width="3" stroke-dasharray="0 100" stroke-dashoffset="25"></circle>
+                </svg>
+                <div id="total-bud-perc" style="position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); font-weight:900; font-size:18px;">0%</div>
+            </div>
+            <div style="display:flex; justify-content:space-around; font-size:12px;">
+                <div><div style="color:var(--text)">ТРАТЫ</div><b id="total-bud-spent">0 ₽</b></div>
+                <div><div style="color:var(--text)">ЛИМИТ</div><b id="total-bud-limit">0 ₽</b></div>
+            </div>
+        </div>
+        <div style="display:flex; justify-content:space-between; align-items:center; margin:20px 0 15px;">
+            <h3 style="margin:0">Лимиты</h3>
+            <button onclick="openBudModal()" style="background:var(--blue); border:none; color:white; padding:8px 15px; border-radius:12px; font-weight:800;">+ Добавить</button>
+        </div>
+        <div id="budget-list"></div>
+    </div>
+
     <nav class="nav">
         <div class="n-item active" id="n-home" onclick="go('home')"><svg viewBox="0 0 24 24"><path d="M3 9.5L12 3l9 6.5V20a1 1 0 01-1 1h-5v-7h-4v7H4a1 1 0 01-1-1V9.5z"/></svg>Главная</div>
         <div class="n-item" id="n-an" onclick="go('an')"><svg viewBox="0 0 24 24"><path d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>История</div>
+        <div class="n-item" id="n-bud" onclick="go('bud')"><svg viewBox="0 0 24 24"><path d="M9 7h6m-6 4h6m-6 4h6M5 21h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v14a2 2 0 002 2z"/></svg>Бюджет</div>
     </nav>
 
     <script>
         const tg = window.Telegram.WebApp;
-        
-        // --- КОНФИГУРАЦИЯ SUPABASE ---
         const SUPABASE_URL = 'https://ereiiidezagburttpxtn.supabase.co';
         const SUPABASE_KEY = 'sb_publishable_YuQ8s49c1LvkCTmoBPQ0hA_7EJ3Z1cj';
         const { createClient } = supabase;
         const _supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
         
-        // --- ЗАЩИТА И ОПРЕДЕЛЕНИЕ ПОЛЬЗОВАТЕЛЯ ---
-        let userId = tg.initDataUnsafe?.user?.id?.toString();
-
-        if (!userId) {
-            // Если открыто не в телеграм, ищем локальный ID или создаем новый уникальный
-            userId = localStorage.getItem('finance_anon_id');
-            if (!userId) {
-                userId = 'user_' + Math.random().toString(36).substr(2, 9);
-                localStorage.setItem('finance_anon_id', userId);
-            }
-            console.log("Вход как аноним:", userId);
-        }
-
+        let userId = tg.initDataUnsafe?.user?.id?.toString() || 'user_demo';
         let db = [];
+        let budgets = JSON.parse(localStorage.getItem('fin_budgets_' + userId)) || [];
         let mode = 'exp', currentCat = '🍎', currentSlide = 0, editingId = null;
 
         const catColors = { '🍎':'#ff453a', '🚗':'#ff9f0a', '🏠':'#30d158', '🛍️':'#0a84ff', '💊':'#bf5af2', '🎁':'#ff375f', '🎭':'#64d2ff', '📦':'#a1a1aa', '💵':'#30d158', '📈':'#0a84ff' };
+        
         const cats = {
-            exp: [{n:'Еда', i:'🍎'}, {n:'Авто', i:'🚗'}, {n:'Жилье', i:'🏠'}, {n:'Шопинг', i:'🛍️'}, {n:'Аптека', i:'💊'}, {n:'Подарки', i:'🎁'}, {n:'Отдых', i:'🎭'}, {n:'Прочее', i:'📦'}],
+            exp: [{n:'Продукты', i:'🍎'}, {n:'Авто', i:'🚗'}, {n:'Жилье', i:'🏠'}, {n:'Шопинг', i:'🛍️'}, {n:'Аптека', i:'💊'}, {n:'Подарки', i:'🎁'}, {n:'Отдых', i:'🎭'}, {n:'Прочее', i:'📦'}],
             inc: [{n:'Зарплата', i:'💵'}, {n:'Инвест', i:'📈'}, {n:'Подарок', i:'🎁'}, {n:'Прочее', i:'📦'}]
         };
 
         function toDateStr(date) { return date.toISOString().split('T')[0]; }
         function showLoad(show) { document.getElementById('loader').style.display = show ? 'block' : 'none'; }
 
-        // --- СИНХРОНИЗАЦИЯ С ЗАЩИТОЙ ---
-
         async function syncFromCloud() {
-            // 1. Сначала показываем что есть в кеше именно для этого userId
             const local = localStorage.getItem('fin_cache_' + userId);
-            if (local) {
-                db = JSON.parse(local);
-                updateUI();
-            }
-
+            if (local) { db = JSON.parse(local); updateUI(); }
             showLoad(true);
             try {
-                const { data, error } = await _supabase
-                    .from('finance')
-                    .select('data')
-                    .eq('id', userId)
-                    .maybeSingle();
-
+                const { data, error } = await _supabase.from('finance').select('data').eq('id', userId).maybeSingle();
                 if (!error && data && data.data) {
                     db = data.data;
-                    // Сортировка по дате и ID (времени)
-                    db.sort((a, b) => {
-                        if (b.d !== a.d) return b.d.localeCompare(a.d);
-                        return b.id - a.id;
-                    });
                     localStorage.setItem('fin_cache_' + userId, JSON.stringify(db));
                     updateUI();
-                } else if (!data) {
-                    // Если пользователя вообще нет в базе, обнуляем (важно для приватности)
-                    if (!local) db = [];
-                    updateUI();
                 }
-            } catch (e) { console.error("Ошибка сети"); }
+            } catch (e) {}
             showLoad(false);
         }
 
         async function cloudSave() {
             localStorage.setItem('fin_cache_' + userId, JSON.stringify(db));
+            localStorage.setItem('fin_budgets_' + userId, JSON.stringify(budgets));
             showLoad(true);
             try {
-                await _supabase
-                    .from('finance')
-                    .upsert({ 
-                        id: userId, 
-                        data: db,
-                        updated_at: new Date().toISOString() 
-                    }, { onConflict: 'id' });
-            } catch (e) { console.error('Ошибка сохранения'); }
+                await _supabase.from('finance').upsert({ id: userId, data: db, updated_at: new Date().toISOString() });
+            } catch (e) {}
             showLoad(false);
+        }
+
+        function openBudModal() { document.getElementById('budget-modal').style.display = 'flex'; }
+        function closeBudModal() { document.getElementById('budget-modal').style.display = 'none'; }
+        
+        function addBudget() {
+            const name = document.getElementById('new-bud-name').value;
+            const val = parseFloat(document.getElementById('new-bud-val').value);
+            if(name && val) {
+                budgets.push({ name, limit: val });
+                cloudSave();
+                closeBudModal();
+                updateUI();
+                document.getElementById('new-bud-name').value = '';
+                document.getElementById('new-bud-val').value = '';
+            }
+        }
+
+        function deleteBudget(idx) {
+            if(confirm('Удалить этот лимит?')) {
+                budgets.splice(idx, 1);
+                cloudSave();
+                updateUI();
+            }
         }
 
         async function save() {
             const s = document.getElementById('sum'), n = document.getElementById('note'), d = document.getElementById('date-picker');
             if(!s.value || s.value <= 0) return;
-            
-            const newRecord = { 
-                id: Date.now(), 
-                t: mode, 
-                c: currentCat, 
-                s: parseFloat(s.value), 
-                n: n.value || 'Без описания', 
-                d: d.value || toDateStr(new Date()) 
-            };
-
+            const newRecord = { id: Date.now(), t: mode, c: currentCat, s: parseFloat(s.value), n: n.value || 'Без описания', d: d.value || toDateStr(new Date()) };
             db.unshift(newRecord);
             updateUI();
             await cloudSave();
-            
             s.value = ''; n.value = '';
             tg.HapticFeedback.notificationOccurred('success');
-        }
-
-        async function confirmEdit() {
-            const item = db.find(x => x.id === editingId);
-            if(item) {
-                item.s = parseFloat(document.getElementById('edit-sum').value);
-                item.n = document.getElementById('edit-note').value;
-                updateUI();
-                closeModal();
-                await cloudSave();
-            }
-        }
-
-        async function deleteTransaction() {
-            if(!confirm('Удалить запись?')) return;
-            db = db.filter(x => x.id !== editingId);
-            updateUI();
-            closeModal();
-            await cloudSave();
-        }
-
-        function toggleBlur() { 
-            const bal = document.getElementById('bal');
-            const eye = document.getElementById('eye-icon');
-            bal.classList.toggle('blurred');
-            eye.innerHTML = bal.classList.contains('blurred') 
-                ? '<path d="M17.94 17.94A10.07 10.07 0 0112 20c-7 0-11-8-11-8a18.45 18.45 0 015.06-5.94M9.9 4.24A9.12 9.12 0 0112 4c7 0 11 8 11 8a18.5 18.5 0 01-2.16 3.19m-6.72-1.07a3 3 0 11-4.24-4.24"></path><line x1="1" y1="1" x2="23" y2="23"></line>'
-                : '<path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle>';
-            tg.HapticFeedback.impactOccurred('light');
         }
 
         function updateUI() {
@@ -289,24 +272,61 @@
             document.getElementById('bal').innerText = total.toLocaleString() + ' ₽';
             renderCats();
             renderHistory();
-            if(document.getElementById('p-an').classList.contains('active')) {
-                drawCharts();
-            }
+            renderBudget();
+            if(document.getElementById('p-an').classList.contains('active')) drawCharts();
         }
 
+        function renderBudget() {
+            const list = document.getElementById('budget-list');
+            const now = new Date();
+            const curMonth = now.getMonth();
+            let tLimit = 0, tSpent = 0;
+
+            list.innerHTML = budgets.map((b, i) => {
+                const spent = db.filter(t => t.t === 'exp' && new Date(t.d).getMonth() === curMonth && (getCatName(t.c).toLowerCase() === b.name.toLowerCase() || t.c === b.name))
+                                .reduce((acc, curr) => acc + curr.s, 0);
+                tLimit += b.limit; tSpent += spent;
+                const perc = Math.min((spent / b.limit) * 100, 100);
+                return `<div class="bud-progress-card" onclick="deleteBudget(${i})">
+                    <div style="display:flex; justify-content:space-between; font-weight:800; font-size:14px;">
+                        <span>${b.name}</span>
+                        <span>${spent.toLocaleString()} / ${b.limit.toLocaleString()} ₽</span>
+                    </div>
+                    <div class="pg-bar"><div class="pg-fill" style="width:${perc}%; background:${spent > b.limit ? 'var(--red)' : 'var(--blue)'}"></div></div>
+                </div>`;
+            }).join('');
+
+            document.getElementById('total-bud-limit').innerText = tLimit.toLocaleString() + ' ₽';
+            document.getElementById('total-bud-spent').innerText = tSpent.toLocaleString() + ' ₽';
+            const totalPerc = tLimit > 0 ? Math.round((tSpent / tLimit) * 100) : 0;
+            document.getElementById('total-bud-perc').innerText = totalPerc + '%';
+            document.getElementById('total-bud-chart').setAttribute('stroke-dasharray', `${Math.min(totalPerc, 100)} 100`);
+            document.getElementById('total-bud-chart').setAttribute('stroke', tSpent > tLimit ? 'var(--red)' : 'var(--blue)');
+        }
+
+        // ОБНОВЛЕННАЯ ФУНКЦИЯ ИСТОРИИ
         function renderHistory() {
             const h = document.getElementById('h-list-full');
             if (!h) return;
             h.innerHTML = db.map(i => {
                 const p = i.d.split('-');
-                return `<div class="h-item" onclick="openEdit(${i.id})">
-                    <div class="h-icon-box" style="color:${catColors[i.c] || 'var(--main)'}">${i.c}</div>
-                    <div class="h-info">
-                        <div class="h-title-row"><span class="h-cat-name">${getCatName(i.c)}</span><span class="h-date">• ${p[2]}.${p[1]}</span></div>
-                        <span class="h-note">${i.n}</span>
-                    </div>
-                    <div class="h-amount" style="color:${i.t === 'exp' ? 'var(--red)' : 'var(--green)'}">${i.t === 'exp' ? '-' : '+'}${i.s.toLocaleString()} ₽</div>
-                </div>`
+                const dateFormatted = `${p[2]}.${p[1]}`;
+                return `
+                    <div class="h-item" onclick="openEdit(${i.id})">
+                        <div class="h-left">
+                            <div class="h-icon-box" style="color:${catColors[i.c] || 'var(--main)'}">${i.c}</div>
+                            <div class="h-details">
+                                <div class="h-title-row">
+                                    <span class="h-cat-name">${getCatName(i.c)}</span>
+                                    <span class="h-date">${dateFormatted}</span>
+                                </div>
+                                <span class="h-note">${i.n}</span>
+                            </div>
+                        </div>
+                        <div class="h-amount" style="color:${i.t === 'exp' ? 'var(--red)' : 'var(--green)'}">
+                            ${i.t === 'exp' ? '-' : '+'}${i.s.toLocaleString()} ₽
+                        </div>
+                    </div>`;
             }).join('');
         }
 
@@ -327,77 +347,25 @@
 
         function closeModal() { document.getElementById('edit-modal').style.display = 'none'; editingId = null; }
 
-        function renderDayChart() {
-            const chart = document.getElementById('day-chart');
-            const today = toDateStr(new Date());
-            const todayExp = db.filter(i => i.t === 'exp' && i.d === today);
-            const total = todayExp.reduce((a, b) => a + b.s, 0);
-            if (total === 0) {
-                chart.innerHTML = `<circle cx="21" cy="21" r="15.9" fill="transparent" stroke="var(--border)" stroke-width="3"/><text x="21" y="21" text-anchor="middle" dy=".3em" fill="var(--text)" font-size="3">Нет трат</text>`;
-                return;
+        async function confirmEdit() {
+            const item = db.find(x => x.id === editingId);
+            if(item) {
+                item.s = parseFloat(document.getElementById('edit-sum').value);
+                item.n = document.getElementById('edit-note').value;
+                updateUI(); closeModal(); await cloudSave();
             }
-            const catSums = {};
-            todayExp.forEach(i => catSums[i.c] = (catSums[i.c] || 0) + i.s);
-            let offset = 0, html = '';
-            Object.entries(catSums).forEach(([cat, sum]) => {
-                const percent = (sum / total) * 100;
-                html += `<circle cx="21" cy="21" r="15.9" fill="transparent" stroke="${catColors[cat] || 'var(--blue)'}" stroke-width="5" stroke-dasharray="${percent} ${100 - percent}" stroke-dashoffset="${-offset}" />`;
-                offset += percent;
-            });
-            html += `<text x="21" y="21" text-anchor="middle" dy=".3em" fill="var(--main)" font-size="5" font-weight="900">${Math.round(total)}₽</text>`;
-            chart.innerHTML = html;
         }
 
-        function renderWeekChart() {
-            const svg = document.getElementById('week-chart');
-            const daysName = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'];
-            const weekSums = new Array(7).fill(0);
-            const now = new Date(), currentDayIdx = (now.getDay() + 6) % 7;
-            for(let i = 0; i < 7; i++) {
-                const d = new Date(now);
-                d.setDate(now.getDate() - currentDayIdx + i);
-                const ds = toDateStr(d);
-                weekSums[i] = db.filter(item => item.t === 'exp' && item.d === ds).reduce((a, b) => a + b.s, 0);
-            }
-            const max = Math.max(...weekSums, 100) * 1.3;
-            svg.innerHTML = weekSums.map((v, i) => {
-                const h = (v / max) * 100, x = 20 + i * 38, y = 130 - h;
-                return `<text x="${x + 12}" y="${y - 8}" text-anchor="middle" fill="var(--main)" font-size="8" font-weight="800">${v > 0 ? Math.round(v) : ''}</text>
-                        <rect x="${x}" y="${y}" width="24" height="${h}" rx="6" fill="${i === currentDayIdx ? 'var(--blue)' : 'var(--btn-bg)'}"/>
-                        <text x="${x + 12}" y="148" text-anchor="middle" fill="var(--text)" font-size="10">${daysName[i]}</text>`;
-            }).join('');
+        async function deleteTransaction() {
+            if(!confirm('Удалить запись?')) return;
+            db = db.filter(x => x.id !== editingId);
+            updateUI(); closeModal(); await cloudSave();
         }
 
-        function renderMonthChart() {
-            const svg = document.getElementById('month-chart');
-            const pointsData = [], now = new Date();
-            for(let i = 5; i >= 0; i--) {
-                let chunkSum = 0, label = "";
-                for(let j = 0; j < 5; j++) {
-                    const d = new Date(now);
-                    d.setDate(now.getDate() - (i * 5 + j));
-                    const ds = toDateStr(d);
-                    if (j === 0) label = ds.split('-').slice(2).join('.'); 
-                    chunkSum += db.filter(item => item.t === 'exp' && item.d === ds).reduce((a, b) => a + b.s, 0);
-                }
-                pointsData.push({ label, val: chunkSum });
-            }
-            const max = Math.max(...pointsData.map(p => p.val), 100) * 1.4;
-            const points = pointsData.map((p, i) => ({ x: 30 + i * 48, y: 130 - (p.val / max * 100) }));
-            let linePath = `M ${points[0].x} ${points[0].y}`;
-            for(let i = 1; i < points.length; i++) linePath += ` L ${points[i].x} ${points[i].y}`;
-            svg.innerHTML = `<defs><linearGradient id="mG" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="var(--blue)" stop-opacity="0.4"/><stop offset="100%" stop-color="var(--blue)" stop-opacity="0"/></linearGradient></defs>
-                <path d="${linePath} L ${points[5].x} 130 L ${points[0].x} 130 Z" fill="url(#mG)" />
-                <path d="${linePath}" fill="none" stroke="var(--blue)" stroke-width="3" stroke-linejoin="round"/>
-                ${points.map((p, i) => `<text x="${p.x}" y="${p.y - 12}" text-anchor="middle" fill="var(--main)" font-size="8" font-weight="800">${pointsData[i].val > 0 ? Math.round(pointsData[i].val) : ''}</text>
-                    <circle cx="${p.x}" cy="${p.y}" r="4" fill="var(--blue)"/><text x="${p.x}" y="148" text-anchor="middle" fill="var(--text)" font-size="9">${pointsData[i].label}</text>`).join('')}`;
-        }
-
-        function drawCharts() {
-            const slider = document.getElementById('chart-slider');
-            if (slider) slider.style.transform = `translateX(-${currentSlide * 100}%)`;
-            document.querySelectorAll('.dot').forEach((d, i) => d.classList.toggle('active', i === currentSlide));
-            renderDayChart(); renderWeekChart(); renderMonthChart();
+        function toggleBlur() { 
+            const bal = document.getElementById('bal');
+            bal.classList.toggle('blurred');
+            tg.HapticFeedback.impactOccurred('light');
         }
 
         function go(p) {
@@ -428,15 +396,76 @@
             });
         }
 
-        let sX = 0;
-        document.getElementById('chart-container').addEventListener('touchstart', e => sX = e.touches[0].clientX);
-        document.getElementById('chart-container').addEventListener('touchend', e => {
-            const d = sX - e.changedTouches[0].clientX;
-            if (Math.abs(d) > 50) {
-                if (d > 0 && currentSlide < 2) currentSlide++; else if (d < 0 && currentSlide > 0) currentSlide--;
-                drawCharts(); tg.HapticFeedback.impactOccurred('light');
+        function renderDayChart() {
+            const chart = document.getElementById('day-chart');
+            const today = toDateStr(new Date());
+            const todayExp = db.filter(i => i.t === 'exp' && i.d === today);
+            const total = todayExp.reduce((a, b) => a + b.s, 0);
+            if (total === 0) {
+                chart.innerHTML = `<circle cx="21" cy="21" r="15.9" fill="transparent" stroke="var(--border)" stroke-width="3"/><text x="21" y="21" text-anchor="middle" dy=".3em" fill="var(--text)" font-size="3">Нет трат</text>`;
+                return;
             }
-        });
+            const catSums = {};
+            todayExp.forEach(i => catSums[i.c] = (catSums[i.c] || 0) + i.s);
+            let offset = 0, html = '';
+            Object.entries(catSums).forEach(([cat, sum]) => {
+                const percent = (sum / total) * 100;
+                html += `<circle cx="21" cy="21" r="15.9" fill="transparent" stroke="${catColors[cat] || 'var(--blue)'}" stroke-width="5" stroke-dasharray="${percent} ${100 - percent}" stroke-dashoffset="${-offset}" />`;
+                offset += percent;
+            });
+            html += `<text x="21" y="21" text-anchor="middle" dy=".3em" fill="var(--main)" font-size="5" font-weight="900">${Math.round(total)}₽</text>`;
+            chart.innerHTML = html;
+        }
+
+        function renderWeekChart() {
+            const svg = document.getElementById('week-chart');
+            const daysName = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'];
+            const weekSums = new Array(7).fill(0);
+            const now = new Date(), currentDayIdx = (now.getDay() + 6) % 7;
+            for(let i = 0; i < 7; i++) {
+                const d = new Date(now); d.setDate(now.getDate() - currentDayIdx + i);
+                const ds = toDateStr(d);
+                weekSums[i] = db.filter(item => item.t === 'exp' && item.d === ds).reduce((a, b) => a + b.s, 0);
+            }
+            const max = Math.max(...weekSums, 100) * 1.3;
+            svg.innerHTML = weekSums.map((v, i) => {
+                const h = (v / max) * 100, x = 20 + i * 38, y = 130 - h;
+                return `<text x="${x + 12}" y="${y - 8}" text-anchor="middle" fill="var(--main)" font-size="8" font-weight="800">${v > 0 ? Math.round(v) : ''}</text>
+                        <rect x="${x}" y="${y}" width="24" height="${h}" rx="6" fill="${i === currentDayIdx ? 'var(--blue)' : 'var(--btn-bg)'}"/>
+                        <text x="${x + 12}" y="148" text-anchor="middle" fill="var(--text)" font-size="10">${daysName[i]}</text>`;
+            }).join('');
+        }
+
+        function renderMonthChart() {
+            const svg = document.getElementById('month-chart');
+            const pointsData = [], now = new Date();
+            for(let i = 5; i >= 0; i--) {
+                let chunkSum = 0, label = "";
+                for(let j = 0; j < 5; j++) {
+                    const d = new Date(now); d.setDate(now.getDate() - (i * 5 + j));
+                    const ds = toDateStr(d);
+                    if (j === 0) label = ds.split('-').slice(2).join('.'); 
+                    chunkSum += db.filter(item => item.t === 'exp' && item.d === ds).reduce((a, b) => a + b.s, 0);
+                }
+                pointsData.push({ label, val: chunkSum });
+            }
+            const max = Math.max(...pointsData.map(p => p.val), 100) * 1.4;
+            const points = pointsData.map((p, i) => ({ x: 30 + i * 48, y: 130 - (p.val / max * 100) }));
+            let linePath = `M ${points[0].x} ${points[0].y}`;
+            for(let i = 1; i < points.length; i++) linePath += ` L ${points[i].x} ${points[i].y}`;
+            svg.innerHTML = `<defs><linearGradient id="mG" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="var(--blue)" stop-opacity="0.4"/><stop offset="100%" stop-color="var(--blue)" stop-opacity="0"/></linearGradient></defs>
+                <path d="${linePath} L ${points[5].x} 130 L ${points[0].x} 130 Z" fill="url(#mG)" />
+                <path d="${linePath}" fill="none" stroke="var(--blue)" stroke-width="3" stroke-linejoin="round"/>
+                ${points.map((p, i) => `<text x="${p.x}" y="${p.y - 12}" text-anchor="middle" fill="var(--main)" font-size="8" font-weight="800">${pointsData[i].val > 0 ? Math.round(pointsData[i].val) : ''}</text>
+                    <circle cx="${p.x}" cy="${p.y}" r="4" fill="var(--blue)"/><text x="${p.x}" y="148" text-anchor="middle" fill="var(--text)" font-size="9">${pointsData[i].label}</text>`).join('')}`;
+        }
+
+        function drawCharts() {
+            const slider = document.getElementById('chart-slider');
+            if (slider) slider.style.transform = `translateX(-${currentSlide * 100}%)`;
+            document.querySelectorAll('.dot').forEach((d, i) => d.classList.toggle('active', i === currentSlide));
+            renderDayChart(); renderWeekChart(); renderMonthChart();
+        }
 
         async function getRates() {
             try {
