@@ -28,10 +28,7 @@
             background: rgba(0,0,0,0.8); backdrop-filter: blur(10px); z-index: 2000; 
             justify-content: center; align-items: center; padding: 20px; box-sizing: border-box;
         }
-        .modal-content { 
-            background: var(--card); width: 100%; max-width: 400px; border-radius: 28px; 
-            padding: 25px; border: 1px solid var(--border); box-shadow: 0 20px 40px rgba(0,0,0,0.5);
-        }
+        .modal-content { background: var(--card); border-radius: 28px; padding: 25px; border: 1px solid var(--border); width: 100%; max-width: 400px; }
 
         .top-bar { display: flex; justify-content: space-between; align-items: center; padding: 10px 20px; background: var(--glass); backdrop-filter: blur(20px); border-bottom: 0.5px solid var(--border); }
         .ticker { display: flex; flex-direction: column; }
@@ -41,90 +38,69 @@
         .sw-box::after { content: ""; position: absolute; width: 20px; height: 20px; left: 2px; top: 2px; background: var(--sw-ball); border-radius: 50%; transition: 0.25s; }
         .light .sw-box::after { transform: translateX(20px); }
         
-        #chart-container { position: relative; height: 240px; margin: 10px 0; background: var(--card); border-radius: 28px; border: 1px solid var(--border); overflow: hidden; touch-action: pan-y; }
+        #chart-container { position: relative; height: 240px; margin: 10px 0; background: var(--card); border-radius: 28px; border: 1px solid var(--border); overflow: hidden; }
         #chart-slider { display: flex; transition: transform 0.4s cubic-bezier(0.2, 0.8, 0.2, 1); height: 100%; }
-        .chart-slide { min-width: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; padding-top: 10px; }
+        .chart-slide { min-width: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; }
         .dots { display: flex; justify-content: center; gap: 8px; margin-bottom: 20px; }
         .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--border); transition: 0.3s; }
         .dot.active { background: var(--blue); transform: scale(1.3); }
 
         .balance-card { background: var(--grad); border-radius: 24px; padding: 25px 20px; margin-bottom: 15px; border: 1px solid var(--border); text-align: center; position: relative; cursor: pointer; }
-        .bal-container { display: flex; align-items: center; justify-content: center; gap: 10px; }
+        .bal-label { font-size: 11px; font-weight: 800; color: var(--text); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px; display: block; }
+        .bal-container { display: flex; align-items: center; justify-content: center; gap: 8px; }
         .bal-amount { font-size: 38px; font-weight: 900; transition: filter 0.3s ease; }
         .bal-amount.blurred { filter: blur(12px); }
-        .eye-icon { width: 24px; height: 24px; stroke: var(--text); fill: none; stroke-width: 2; transition: 0.2s; }
+        .eye-icon { width: 20px; height: 20px; stroke: var(--text); fill: none; stroke-width: 2.5; }
 
         .input-section { background: var(--card); border-radius: 24px; padding: 15px; border: 1px solid var(--border); margin-bottom: 15px; display: flex; flex-direction: column; gap: 10px; }
         .sum-in { width: 100%; background: transparent; border: none; color: var(--main); font-size: 40px; font-weight: 900; text-align: center; outline: none; }
         .note-in { width: 100%; background: var(--btn-bg); border: none; border-radius: 12px; padding: 12px; color: var(--main); font-size: 15px; box-sizing: border-box; text-align: center; outline: none; }
         .date-in { width: 100%; background: var(--btn-bg); border: none; border-radius: 12px; padding: 10px; color: var(--blue); font-size: 14px; font-weight: 700; text-align: center; box-sizing: border-box; outline: none; }
         .save-btn { background: var(--blue); color: white; border: none; border-radius: 18px; padding: 16px; font-size: 16px; font-weight: 800; width: 100%; cursor:pointer; }
-        .del-btn { background: var(--red); color: white; border: none; border-radius: 18px; padding: 12px; font-size: 14px; font-weight: 700; width: 100%; margin-top: 10px; cursor:pointer; }
         
-        .total-budget-card { background: var(--card); border-radius: 28px; padding: 20px; border: 1px solid var(--border); margin-bottom: 20px; text-align: center; }
-        .bud-progress-card { background: var(--card); border-radius: 20px; padding: 16px; margin-bottom: 10px; border: 1px solid var(--border); cursor: pointer; }
-        .pg-bar { width: 100%; height: 8px; background: var(--btn-bg); border-radius: 10px; margin-top: 10px; overflow: hidden; }
-        .pg-fill { height: 100%; transition: 0.5s; }
-
         .cat-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-top: 20px; }
         .cat-icon { width: 52px; height: 52px; background: var(--btn-bg); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 22px; border: 2px solid transparent; transition: 0.2s; margin: 0 auto; }
         .cat-item.active .cat-icon { border-color: var(--blue); background: var(--blue); }
         .cat-name { font-size: 10px; color: var(--text); font-weight: 600; margin-top: 6px; display: block; text-align: center; }
 
-        .h-item { display: flex; justify-content: space-between; align-items: center; padding: 14px; background: var(--card); border-radius: 20px; margin-bottom: 10px; border: 1px solid var(--border); cursor: pointer; }
-        .h-left { display: flex; align-items: center; gap: 12px; flex: 1; overflow: hidden; }
-        .h-icon-box { font-size: 24px; min-width: 32px; text-align: center; }
-        .h-details { display: flex; flex-direction: column; gap: 2px; overflow: hidden; }
-        .h-title-row { display: flex; align-items: center; gap: 8px; }
-        .h-cat-name { font-weight: 800; font-size: 15px; color: var(--main); }
-        .h-date { font-size: 11px; color: var(--text); font-weight: 600; }
-        .h-note { font-size: 12px; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-        .h-amount { font-weight: 900; font-size: 16px; white-space: nowrap; margin-left: 10px; }
+        .h-item { display: flex; justify-content: space-between; align-items: center; padding: 14px; background: var(--card); border-radius: 20px; margin-bottom: 10px; border: 1px solid var(--border); }
+        .h-amount { font-weight: 900; font-size: 16px; }
 
-        /* ПОЛНОСТЬЮ ПРОЗРАЧНЫЙ НИЖНИЙ БАР */
-        .nav { 
-            position: fixed; 
-            bottom: 0; 
-            width: 100%; 
-            background: transparent; /* Убрали фон */
-            display: flex; 
-            border-top: 1px solid var(--border); /* Оставили только тонкую полоску сверху */
-            padding-bottom: env(safe-area-inset-bottom, 15px); 
-            z-index: 1000;
-        }
+        .nav { position: fixed; bottom: 0; width: 100%; display: flex; padding-bottom: env(safe-area-inset-bottom, 15px); z-index: 1000; transition: 0.3s; }
+        .nav-home { background: transparent; border-top: none; }
+        .nav-other { background: var(--glass); backdrop-filter: blur(20px); border-top: 0.5px solid var(--border); }
+
         .n-item { flex: 1; text-align: center; padding: 12px 0; color: var(--text); font-size: 10px; font-weight: 700; text-transform: uppercase; }
         .n-item.active { color: var(--blue); }
         .n-item svg { width: 22px; height: 22px; display: block; margin: 0 auto 4px; stroke: currentColor; fill: none; stroke-width: 2.5; }
-        
-        #loader { position: fixed; top: 0; left: 0; width: 100%; height: 2px; background: var(--blue); z-index: 3000; display: none; }
+
+        .total-budget-card { background: var(--card); border-radius: 28px; padding: 20px; border: 1px solid var(--border); margin-bottom: 20px; text-align: center; }
+        .bud-progress-card { background: var(--card); border-radius: 20px; padding: 16px; margin-bottom: 10px; border: 1px solid var(--border); }
+        .pg-bar { width: 100%; height: 8px; background: var(--btn-bg); border-radius: 10px; margin-top: 10px; overflow: hidden; }
+        .pg-fill { height: 100%; transition: 0.5s; }
+
         @keyframes slideUp { from { opacity: 0; transform: translateY(15px); } to { opacity: 1; transform: translateY(0); } }
     </style>
 </head>
 <body>
 
-    <div id="loader"></div>
+    <div id="edit-modal"><div class="modal-content">
+        <h3 style="text-align:center;">Редактировать</h3>
+        <input type="number" id="edit-sum" class="sum-in">
+        <input type="text" id="edit-note" class="note-in" style="margin: 15px 0;">
+        <button class="save-btn" onclick="confirmEdit()">Сохранить</button>
+        <button class="save-btn" style="background:var(--red); margin-top:10px;" onclick="deleteTransaction()">Удалить</button>
+        <button class="note-in" style="margin-top:10px; background:none;" onclick="closeModal()">Отмена</button>
+    </div></div>
 
-    <div id="edit-modal">
-        <div class="modal-content">
-            <h3 style="margin-top:0; text-align:center;">Редактировать</h3>
-            <input type="number" id="edit-sum" class="sum-in" style="font-size:30px; margin-bottom:15px;">
-            <input type="text" id="edit-note" class="note-in" style="margin-bottom:20px;">
-            <button class="save-btn" onclick="confirmEdit()">Сохранить</button>
-            <button class="del-btn" onclick="deleteTransaction()">Удалить запись</button>
-            <button class="note-in" style="margin-top:10px; background:none; color:var(--text);" onclick="closeModal()">Отмена</button>
-        </div>
-    </div>
-
-    <div id="budget-modal">
-        <div class="modal-content">
-            <h3 id="bud-modal-title" style="margin-top:0; text-align:center;">Новый лимит</h3>
-            <input type="text" id="new-bud-name" class="note-in" placeholder="Название (например: Продукты)">
-            <input type="number" id="new-bud-val" class="note-in" style="margin-top:10px;" placeholder="Сумма лимита">
-            <button id="bud-save-btn" class="save-btn" style="margin-top:20px;" onclick="addBudget()">Создать</button>
-            <button id="bud-del-btn" class="del-btn" style="display:none;" onclick="deleteBudgetReal()">Удалить лимит</button>
-            <button class="note-in" style="margin-top:10px; background:none; color:var(--text);" onclick="closeBudModal()">Отмена</button>
-        </div>
-    </div>
+    <div id="budget-modal"><div class="modal-content">
+        <h3 id="bud-modal-title" style="text-align:center;">Лимит</h3>
+        <input type="text" id="new-bud-name" class="note-in" placeholder="Название">
+        <input type="number" id="new-bud-val" class="note-in" style="margin-top:10px;" placeholder="Сумма">
+        <button id="bud-save-btn" class="save-btn" style="margin-top:20px;" onclick="addBudget()">Сохранить</button>
+        <button id="bud-del-btn" class="save-btn" style="background:var(--red); display:none; margin-top:10px;" onclick="deleteBudgetReal()">Удалить</button>
+        <button class="note-in" style="margin-top:10px; background:none;" onclick="closeBudModal()">Отмена</button>
+    </div></div>
 
     <div class="top-bar" id="top-bar">
         <div style="display:flex; gap:15px;">
@@ -136,18 +112,18 @@
 
     <div id="p-home" class="page active">
         <div class="balance-card" onclick="toggleBlur()">
+            <span class="bal-label">Баланс</span>
             <div class="bal-container">
                 <div class="bal-amount" id="bal">0 ₽</div>
-                <svg id="eye-icon" class="eye-icon" viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+                <svg class="eye-icon" viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
             </div>
         </div>
-
         <div style="display:flex; gap:8px; background:var(--btn-bg); padding:4px; border-radius:12px; margin-bottom:15px;">
             <div id="btn-exp" style="flex:1; text-align:center; padding:10px; border-radius:10px; font-size:12px; font-weight:800; cursor:pointer; background:var(--blue);" onclick="setMode('exp')">Расход</div>
             <div id="btn-inc" style="flex:1; text-align:center; padding:10px; border-radius:10px; font-size:12px; font-weight:800; cursor:pointer;" onclick="setMode('inc')">Доход</div>
         </div>
         <div class="input-section">
-            <input type="number" id="sum" class="sum-in" inputmode="decimal" placeholder="0">
+            <input type="number" id="sum" class="sum-in" placeholder="0">
             <input type="text" id="note" class="note-in" placeholder="Заметка...">
             <input type="date" id="date-picker" class="date-in">
             <button class="save-btn" onclick="save()">Добавить запись</button>
@@ -156,40 +132,34 @@
     </div>
 
     <div id="p-an" class="page">
-        <div id="chart-container">
-            <div id="chart-slider">
-                <div class="chart-slide"><svg width="150" height="150" viewBox="0 0 42 42" id="day-chart"></svg><div style="font-size:12px; font-weight:700; margin-top:10px;">Сегодня по категориям</div></div>
-                <div class="chart-slide"><svg width="300" height="160" id="week-chart"></svg><div style="font-size:12px; font-weight:700; margin-top:5px;">Неделя</div></div>
-                <div class="chart-slide"><svg width="300" height="160" id="month-chart"></svg><div style="font-size:12px; font-weight:700; margin-top:5px;">Месяц</div></div>
-            </div>
-        </div>
+        <div id="chart-container"><div id="chart-slider">
+            <div class="chart-slide"><svg width="150" height="150" viewBox="0 0 42 42" id="day-chart"></svg></div>
+            <div class="chart-slide"><svg width="300" height="160" id="week-chart"></svg></div>
+            <div class="chart-slide"><svg width="300" height="160" id="month-chart"></svg></div>
+        </div></div>
         <div class="dots"><div class="dot active"></div><div class="dot"></div><div class="dot"></div></div>
         <div id="h-list-full"></div>
     </div>
 
     <div id="p-bud" class="page">
-        <h2 style="margin: 0 0 20px 0;">Бюджет на месяц</h2>
         <div class="total-budget-card">
             <div style="position:relative; width:120px; height:120px; margin: 0 auto 15px;">
                 <svg width="120" height="120" viewBox="0 0 42 42">
                     <circle cx="21" cy="21" r="15.9" fill="transparent" stroke="var(--btn-bg)" stroke-width="3"></circle>
                     <circle id="total-bud-chart" cx="21" cy="21" r="15.9" fill="transparent" stroke="var(--blue)" stroke-width="3" stroke-dasharray="0 100" stroke-dashoffset="25"></circle>
                 </svg>
-                <div id="total-bud-perc" style="position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); font-weight:900; font-size:18px;">0%</div>
+                <div id="total-bud-perc" style="position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); font-weight:900;">0%</div>
             </div>
             <div style="display:flex; justify-content:space-around; font-size:12px;">
                 <div><div style="color:var(--text)">ТРАТЫ</div><b id="total-bud-spent">0 ₽</b></div>
                 <div><div style="color:var(--text)">ЛИМИТ</div><b id="total-bud-limit">0 ₽</b></div>
             </div>
         </div>
-        <div style="display:flex; justify-content:space-between; align-items:center; margin:20px 0 15px;">
-            <h3 style="margin:0">Лимиты</h3>
-            <button onclick="openBudModal()" style="background:var(--blue); border:none; color:white; padding:8px 15px; border-radius:12px; font-weight:800;">+ Добавить</button>
-        </div>
+        <button onclick="openBudModal()" style="width:100%; background:var(--btn-bg); border:none; color:var(--main); padding:15px; border-radius:15px; margin-bottom:20px; font-weight:800;">+ Добавить лимит</button>
         <div id="budget-list"></div>
     </div>
 
-    <nav class="nav">
+    <nav class="nav nav-home" id="main-nav">
         <div class="n-item active" id="n-home" onclick="go('home')"><svg viewBox="0 0 24 24"><path d="M3 9.5L12 3l9 6.5V20a1 1 0 01-1 1h-5v-7h-4v7H4a1 1 0 01-1-1V9.5z"/></svg>Главная</div>
         <div class="n-item" id="n-an" onclick="go('an')"><svg viewBox="0 0 24 24"><path d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>История</div>
         <div class="n-item" id="n-bud" onclick="go('bud')"><svg viewBox="0 0 24 24"><path d="M9 7h6m-6 4h6m-6 4h6M5 21h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v14a2 2 0 002 2z"/></svg>Бюджет</div>
@@ -197,10 +167,8 @@
 
     <script>
         const tg = window.Telegram.WebApp;
-        const SUPABASE_URL = 'https://ereiiidezagburttpxtn.supabase.co';
-        const SUPABASE_KEY = 'sb_publishable_YuQ8s49c1LvkCTmoBPQ0hA_7EJ3Z1cj';
         const { createClient } = supabase;
-        const _supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
+        const _supabase = createClient('https://ereiiidezagburttpxtn.supabase.co', 'sb_publishable_YuQ8s49c1LvkCTmoBPQ0hA_7EJ3Z1cj');
         
         let userId = tg.initDataUnsafe?.user?.id?.toString() || 'user_demo';
         let db = [];
@@ -208,335 +176,144 @@
         let mode = 'exp', currentCat = '🍎', currentSlide = 0, editingId = null, editingBudIdx = null;
 
         const catColors = { '🍎':'#ff453a', '🚗':'#ff9f0a', '🏠':'#30d158', '🛍️':'#0a84ff', '💊':'#bf5af2', '🎁':'#ff375f', '🎭':'#64d2ff', '📦':'#a1a1aa', '💵':'#30d158', '📈':'#0a84ff' };
-        
         const cats = {
-            exp: [{n:'Продукты', i:'🍎'}, {n:'Авто', i:'🚗'}, {n:'Жилье', i:'🏠'}, {n:'Шопинг', i:'🛍️'}, {n:'Аптека', i:'💊'}, {n:'Подарки', i:'🎁'}, {n:'Отдых', i:'🎭'}, {n:'Прочее', i:'📦'}],
+            exp: [{n:'Еда', i:'🍎'}, {n:'Авто', i:'🚗'}, {n:'Жилье', i:'🏠'}, {n:'Шопинг', i:'🛍️'}, {n:'Аптека', i:'💊'}, {n:'Подарки', i:'🎁'}, {n:'Отдых', i:'🎭'}, {n:'Прочее', i:'📦'}],
             inc: [{n:'Зарплата', i:'💵'}, {n:'Инвест', i:'📈'}, {n:'Подарок', i:'🎁'}, {n:'Прочее', i:'📦'}]
         };
-
-        let touchStartX = 0;
-        const chartContainer = document.getElementById('chart-container');
-        chartContainer.addEventListener('touchstart', e => { touchStartX = e.changedTouches[0].screenX; });
-        chartContainer.addEventListener('touchend', e => {
-            let touchEndX = e.changedTouches[0].screenX;
-            if (touchStartX - touchEndX > 50 && currentSlide < 2) { currentSlide++; drawCharts(); }
-            if (touchEndX - touchStartX > 50 && currentSlide > 0) { currentSlide--; drawCharts(); }
-        });
-
-        function toDateStr(date) { return date.toISOString().split('T')[0]; }
-        function showLoad(show) { document.getElementById('loader').style.display = show ? 'block' : 'none'; }
-
-        async function syncFromCloud() {
-            const local = localStorage.getItem('fin_cache_' + userId);
-            if (local) { db = JSON.parse(local); updateUI(); }
-            showLoad(true);
-            try {
-                const { data, error } = await _supabase.from('finance').select('data').eq('id', userId).maybeSingle();
-                if (!error && data && data.data) {
-                    db = data.data;
-                    localStorage.setItem('fin_cache_' + userId, JSON.stringify(db));
-                    updateUI();
-                }
-            } catch (e) {}
-            showLoad(false);
-        }
-
-        async function cloudSave() {
-            localStorage.setItem('fin_cache_' + userId, JSON.stringify(db));
-            localStorage.setItem('fin_budgets_' + userId, JSON.stringify(budgets));
-            showLoad(true);
-            try {
-                await _supabase.from('finance').upsert({ id: userId, data: db, updated_at: new Date().toISOString() });
-            } catch (e) {}
-            showLoad(false);
-        }
-
-        function openBudModal(idx = null) {
-            editingBudIdx = idx;
-            const modal = document.getElementById('budget-modal');
-            const title = document.getElementById('bud-modal-title');
-            const btn = document.getElementById('bud-save-btn');
-            const delBtn = document.getElementById('bud-del-btn');
-            
-            if(idx !== null) {
-                const b = budgets[idx];
-                document.getElementById('new-bud-name').value = b.name;
-                document.getElementById('new-bud-val').value = b.limit;
-                title.innerText = "Изменить лимит";
-                btn.innerText = "Сохранить";
-                delBtn.style.display = "block";
-            } else {
-                document.getElementById('new-bud-name').value = '';
-                document.getElementById('new-bud-val').value = '';
-                title.innerText = "Новый лимит";
-                btn.innerText = "Создать";
-                delBtn.style.display = "none";
-            }
-            modal.style.display = 'flex';
-        }
-
-        function closeBudModal() { 
-            document.getElementById('budget-modal').style.display = 'none'; 
-            editingBudIdx = null; 
-        }
-        
-        function addBudget() {
-            const name = document.getElementById('new-bud-name').value;
-            const val = parseFloat(document.getElementById('new-bud-val').value);
-            if(name && val) {
-                if(editingBudIdx !== null) {
-                    budgets[editingBudIdx] = { name, limit: val };
-                } else {
-                    budgets.push({ name, limit: val });
-                }
-                cloudSave();
-                closeBudModal();
-                updateUI();
-            }
-        }
-
-        function deleteBudgetReal() {
-            if(editingBudIdx !== null && confirm('Удалить этот лимит?')) {
-                budgets.splice(editingBudIdx, 1);
-                cloudSave();
-                closeBudModal();
-                updateUI();
-            }
-        }
-
-        function getBudColor(perc) {
-            if(perc >= 100) return 'var(--red)';
-            if(perc >= 80) return 'var(--orange)';
-            return 'var(--blue)';
-        }
-
-        function renderBudget() {
-            const list = document.getElementById('budget-list');
-            const now = new Date();
-            const curMonth = now.getMonth();
-            let tLimit = 0, tSpent = 0;
-
-            list.innerHTML = budgets.map((b, i) => {
-                const spent = db.filter(t => t.t === 'exp' && new Date(t.d).getMonth() === curMonth && (getCatName(t.c).toLowerCase() === b.name.toLowerCase() || t.c === b.name))
-                                .reduce((acc, curr) => acc + curr.s, 0);
-                tLimit += b.limit; tSpent += spent;
-                const perc = Math.min((spent / b.limit) * 100, 100);
-                const color = getBudColor((spent/b.limit)*100);
-
-                return `<div class="bud-progress-card" onclick="openBudModal(${i})">
-                    <div style="display:flex; justify-content:space-between; font-weight:800; font-size:14px;">
-                        <span>${b.name}</span>
-                        <span style="color:${color}">${spent.toLocaleString()} / ${b.limit.toLocaleString()} ₽</span>
-                    </div>
-                    <div class="pg-bar"><div class="pg-fill" style="width:${perc}%; background:${color}"></div></div>
-                </div>`;
-            }).join('');
-
-            document.getElementById('total-bud-limit').innerText = tLimit.toLocaleString() + ' ₽';
-            document.getElementById('total-bud-spent').innerText = tSpent.toLocaleString() + ' ₽';
-            const totalPerc = tLimit > 0 ? Math.round((tSpent / tLimit) * 100) : 0;
-            document.getElementById('total-bud-perc').innerText = totalPerc + '%';
-            document.getElementById('total-bud-chart').setAttribute('stroke-dasharray', `${Math.min(totalPerc, 100)} 100`);
-            document.getElementById('total-bud-chart').setAttribute('stroke', getBudColor(totalPerc));
-        }
-
-        async function save() {
-            const s = document.getElementById('sum'), n = document.getElementById('note'), d = document.getElementById('date-picker');
-            if(!s.value || s.value <= 0) return;
-            const newRecord = { id: Date.now(), t: mode, c: currentCat, s: parseFloat(s.value), n: n.value || 'Без описания', d: d.value || toDateStr(new Date()) };
-            db.unshift(newRecord);
-            updateUI();
-            await cloudSave();
-            s.value = ''; n.value = '';
-            tg.HapticFeedback.notificationOccurred('success');
-        }
-
-        function updateUI() {
-            const total = db.reduce((a,i) => a + (i.t === 'inc' ? i.s : -i.s), 0);
-            document.getElementById('bal').innerText = total.toLocaleString() + ' ₽';
-            renderCats();
-            renderHistory();
-            renderBudget();
-            if(document.getElementById('p-an').classList.contains('active')) drawCharts();
-        }
-
-        function renderHistory() {
-            const h = document.getElementById('h-list-full');
-            if (!h) return;
-            h.innerHTML = db.map(i => {
-                const p = i.d.split('-');
-                return `<div class="h-item" onclick="openEdit(${i.id})">
-                        <div class="h-left">
-                            <div class="h-icon-box" style="color:${catColors[i.c] || 'var(--main)'}">${i.c}</div>
-                            <div class="h-details">
-                                <div class="h-title-row"><span class="h-cat-name">${getCatName(i.c)}</span><span class="h-date">${p[2]}.${p[1]}</span></div>
-                                <span class="h-note">${i.n}</span>
-                            </div>
-                        </div>
-                        <div class="h-amount" style="color:${i.t === 'exp' ? 'var(--red)' : 'var(--green)'}">
-                            ${i.t === 'exp' ? '-' : '+'}${i.s.toLocaleString()} ₽
-                        </div>
-                    </div>`;
-            }).join('');
-        }
-
-        function getCatName(icon) {
-            const all = [...cats.exp, ...cats.inc];
-            const found = all.find(c => c.i === icon);
-            return found ? found.n : 'Разное';
-        }
-
-        function openEdit(id) {
-            editingId = id;
-            const item = db.find(x => x.id === id);
-            if (!item) return;
-            document.getElementById('edit-sum').value = item.s;
-            document.getElementById('edit-note').value = item.n;
-            document.getElementById('edit-modal').style.display = 'flex';
-        }
-
-        function closeModal() { document.getElementById('edit-modal').style.display = 'none'; editingId = null; }
-
-        async function confirmEdit() {
-            const item = db.find(x => x.id === editingId);
-            if(item) {
-                item.s = parseFloat(document.getElementById('edit-sum').value);
-                item.n = document.getElementById('edit-note').value;
-                updateUI(); closeModal(); await cloudSave();
-            }
-        }
-
-        async function deleteTransaction() {
-            if(!confirm('Удалить запись?')) return;
-            db = db.filter(x => x.id !== editingId);
-            updateUI(); closeModal(); await cloudSave();
-        }
-
-        function toggleBlur() { 
-            const bal = document.getElementById('bal');
-            bal.classList.toggle('blurred');
-            tg.HapticFeedback.impactOccurred('light');
-        }
 
         function go(p) {
             document.querySelectorAll('.page').forEach(e => e.classList.remove('active'));
             document.querySelectorAll('.n-item').forEach(e => e.classList.remove('active'));
             document.getElementById('p-'+p).classList.add('active');
             document.getElementById('n-'+p).classList.add('active');
-            document.getElementById('top-bar').style.display = (p === 'home') ? 'flex' : 'none';
+            const nav = document.getElementById('main-nav');
+            if(p === 'home') { nav.classList.add('nav-home'); nav.classList.remove('nav-other'); document.getElementById('top-bar').style.display = 'flex'; }
+            else { nav.classList.remove('nav-home'); nav.classList.add('nav-other'); document.getElementById('top-bar').style.display = 'none'; }
             updateUI();
         }
 
-        function setMode(m) {
-            mode = m; renderCats();
-            document.getElementById('btn-exp').style.background = m === 'exp' ? 'var(--blue)' : 'transparent';
-            document.getElementById('btn-inc').style.background = m === 'inc' ? 'var(--blue)' : 'transparent';
+        async function syncFromCloud() {
+            const local = localStorage.getItem('fin_cache_' + userId);
+            if (local) { db = JSON.parse(local); updateUI(); }
+            const { data } = await _supabase.from('finance').select('data').eq('id', userId).maybeSingle();
+            if (data?.data) { db = data.data; localStorage.setItem('fin_cache_' + userId, JSON.stringify(db)); updateUI(); }
         }
 
-        function renderCats() {
-            const container = document.getElementById('cat-list'); 
-            if (!container) return;
-            container.innerHTML = '';
-            cats[mode].forEach(c => {
-                const div = document.createElement('div');
-                div.className = `cat-item ${currentCat === c.i ? 'active' : ''}`;
-                div.innerHTML = `<div class="cat-icon">${c.i}</div><span class="cat-name">${c.n}</span>`;
-                div.onclick = () => { currentCat = c.i; renderCats(); };
-                container.appendChild(div);
-            });
+        async function cloudSave() {
+            localStorage.setItem('fin_cache_' + userId, JSON.stringify(db));
+            localStorage.setItem('fin_budgets_' + userId, JSON.stringify(budgets));
+            await _supabase.from('finance').upsert({ id: userId, data: db, updated_at: new Date().toISOString() });
+        }
+
+        function updateUI() {
+            const total = db.reduce((a,i) => a + (i.t === 'inc' ? i.s : -i.s), 0);
+            document.getElementById('bal').innerText = total.toLocaleString() + ' ₽';
+            renderCats(); renderHistory(); renderBudget();
+            if(document.getElementById('p-an').classList.contains('active')) drawCharts();
+        }
+
+        async function save() {
+            const s = document.getElementById('sum'), n = document.getElementById('note');
+            if(!s.value) return;
+            db.unshift({ id: Date.now(), t: mode, c: currentCat, s: parseFloat(s.value), n: n.value || 'Запись', d: document.getElementById('date-picker').value });
+            updateUI(); await cloudSave();
+            s.value = ''; n.value = ''; tg.HapticFeedback.notificationOccurred('success');
+        }
+
+        function renderHistory() {
+            const h = document.getElementById('h-list-full');
+            h.innerHTML = db.map(i => `<div class="h-item" onclick="openEdit(${i.id})"><div style="display:flex; align-items:center; gap:10px;"><span style="font-size:20px;">${i.c}</span><div><b>${getCatName(i.c)}</b><br><small style="color:var(--text)">${i.d}</small></div></div><div class="h-amount" style="color:${i.t==='exp'?'var(--red)':'var(--green)'}">${i.s.toLocaleString()} ₽</div></div>`).join('');
+        }
+
+        function getCatName(icon) {
+            const all = [...cats.exp, ...cats.inc];
+            const found = all.find(c => c.i === icon);
+            return found ? found.n : 'Прочее';
+        }
+
+        function openEdit(id) { editingId = id; const item = db.find(x => x.id === id); document.getElementById('edit-sum').value = item.s; document.getElementById('edit-note').value = item.n; document.getElementById('edit-modal').style.display = 'flex'; }
+        function closeModal() { document.getElementById('edit-modal').style.display = 'none'; }
+        async function confirmEdit() { const item = db.find(x => x.id === editingId); item.s = parseFloat(document.getElementById('edit-sum').value); item.n = document.getElementById('edit-note').value; updateUI(); closeModal(); await cloudSave(); }
+        async function deleteTransaction() { db = db.filter(x => x.id !== editingId); updateUI(); closeModal(); await cloudSave(); }
+
+        function openBudModal(idx = null) { editingBudIdx = idx; if(idx !== null) { document.getElementById('new-bud-name').value = budgets[idx].name; document.getElementById('new-bud-val').value = budgets[idx].limit; document.getElementById('bud-del-btn').style.display = 'block'; } else { document.getElementById('new-bud-name').value = ''; document.getElementById('new-bud-val').value = ''; document.getElementById('bud-del-btn').style.display = 'none'; } document.getElementById('budget-modal').style.display = 'flex'; }
+        function closeBudModal() { document.getElementById('budget-modal').style.display = 'none'; }
+        function addBudget() { const n = document.getElementById('new-bud-name').value, v = parseFloat(document.getElementById('new-bud-val').value); if(editingBudIdx !== null) budgets[editingBudIdx] = {name:n, limit:v}; else budgets.push({name:n, limit:v}); closeBudModal(); updateUI(); cloudSave(); }
+        function deleteBudgetReal() { budgets.splice(editingBudIdx, 1); closeBudModal(); updateUI(); cloudSave(); }
+
+        function renderBudget() {
+            const list = document.getElementById('budget-list'); let tLimit = 0, tSpent = 0;
+            list.innerHTML = budgets.map((b, i) => {
+                const spent = db.filter(t => t.t === 'exp' && (getCatName(t.c) === b.name || t.c === b.name)).reduce((a,c)=>a+c.s, 0);
+                tLimit += b.limit; tSpent += spent; const perc = Math.min((spent/b.limit)*100, 100);
+                return `<div class="bud-progress-card" onclick="openBudModal(${i})"><div style="display:flex; justify-content:space-between; font-size:14px;"><b>${b.name}</b><span>${spent.toLocaleString()} / ${b.limit.toLocaleString()} ₽</span></div><div class="pg-bar"><div class="pg-fill" style="width:${perc}%; background:${perc > 90 ? 'var(--red)' : 'var(--blue)'}"></div></div></div>`;
+            }).join('');
+            document.getElementById('total-bud-limit').innerText = tLimit.toLocaleString() + ' ₽';
+            document.getElementById('total-bud-spent').innerText = tSpent.toLocaleString() + ' ₽';
+            const totalPerc = tLimit > 0 ? Math.round((tSpent/tLimit)*100) : 0;
+            document.getElementById('total-bud-perc').innerText = totalPerc + '%';
+            document.getElementById('total-bud-chart').style.strokeDasharray = `${Math.min(totalPerc, 100)} 100`;
+        }
+
+        function drawCharts() {
+            const slider = document.getElementById('chart-slider');
+            if(slider) slider.style.transform = `translateX(-${currentSlide * 100}%)`;
+            document.querySelectorAll('.dot').forEach((d, i) => d.classList.toggle('active', i === currentSlide));
+            renderDayChart(); renderWeekChart(); renderMonthChart();
         }
 
         function renderDayChart() {
             const chart = document.getElementById('day-chart');
-            const today = toDateStr(new Date());
+            const today = new Date().toISOString().split('T')[0];
             const todayExp = db.filter(i => i.t === 'exp' && i.d === today);
             const total = todayExp.reduce((a, b) => a + b.s, 0);
-            if (total === 0) {
-                chart.innerHTML = `<circle cx="21" cy="21" r="15.9" fill="transparent" stroke="var(--border)" stroke-width="3"/><text x="21" y="21" text-anchor="middle" dy=".3em" fill="var(--text)" font-size="3">Нет трат</text>`;
-                return;
-            }
-            const catSums = {};
-            todayExp.forEach(i => catSums[i.c] = (catSums[i.c] || 0) + i.s);
+            if (total === 0) { chart.innerHTML = `<circle cx="21" cy="21" r="15.9" fill="transparent" stroke="var(--border)" stroke-width="3"/><text x="21" y="21" text-anchor="middle" dy=".3em" fill="var(--text)" font-size="3">0₽</text>`; return; }
+            const catSums = {}; todayExp.forEach(i => catSums[i.c] = (catSums[i.c] || 0) + i.s);
             let offset = 0, html = '';
             Object.entries(catSums).forEach(([cat, sum]) => {
                 const percent = (sum / total) * 100;
                 html += `<circle cx="21" cy="21" r="15.9" fill="transparent" stroke="${catColors[cat] || 'var(--blue)'}" stroke-width="5" stroke-dasharray="${percent} ${100 - percent}" stroke-dashoffset="${-offset}" />`;
                 offset += percent;
             });
-            html += `<text x="21" y="21" text-anchor="middle" dy=".3em" fill="var(--main)" font-size="5" font-weight="900">${Math.round(total)}₽</text>`;
+            html += `<text x="21" y="21" text-anchor="middle" dy=".3em" fill="var(--main)" font-size="5" font-weight="900">${Math.round(total)}</text>`;
             chart.innerHTML = html;
         }
 
         function renderWeekChart() {
-            const svg = document.getElementById('week-chart');
-            const daysName = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'];
-            const weekSums = new Array(7).fill(0);
-            const now = new Date(), currentDayIdx = (now.getDay() + 6) % 7;
-            for(let i = 0; i < 7; i++) {
-                const d = new Date(now); d.setDate(now.getDate() - currentDayIdx + i);
-                const ds = toDateStr(d);
-                weekSums[i] = db.filter(item => item.t === 'exp' && item.d === ds).reduce((a, b) => a + b.s, 0);
+            const svg = document.getElementById('week-chart'); const weekSums = new Array(7).fill(0);
+            for(let i=0; i<7; i++) {
+                const d = new Date(); d.setDate(d.getDate() - i); const ds = d.toISOString().split('T')[0];
+                weekSums[6-i] = db.filter(item => item.t === 'exp' && item.d === ds).reduce((a, b) => a + b.s, 0);
             }
-            const max = Math.max(...weekSums, 100) * 1.3;
-            svg.innerHTML = weekSums.map((v, i) => {
-                const h = (v / max) * 100, x = 20 + i * 38, y = 130 - h;
-                return `<text x="${x + 12}" y="${y - 8}" text-anchor="middle" fill="var(--main)" font-size="8" font-weight="800">${v > 0 ? Math.round(v) : ''}</text>
-                        <rect x="${x}" y="${y}" width="24" height="${h}" rx="6" fill="${i === currentDayIdx ? 'var(--blue)' : 'var(--btn-bg)'}"/>
-                        <text x="${x + 12}" y="148" text-anchor="middle" fill="var(--text)" font-size="10">${daysName[i]}</text>`;
-            }).join('');
+            const max = Math.max(...weekSums, 100) * 1.2;
+            svg.innerHTML = weekSums.map((v, i) => { const h = (v/max)*100, x = 20 + i*40, y = 130-h; return `<rect x="${x}" y="${y}" width="20" height="${h}" rx="4" fill="var(--blue)"/><text x="${x+10}" y="150" text-anchor="middle" fill="var(--text)" font-size="8">${i+1}</text>`; }).join('');
         }
 
         function renderMonthChart() {
-            const svg = document.getElementById('month-chart');
-            const pointsData = [], now = new Date();
-            for(let i = 5; i >= 0; i--) {
-                let chunkSum = 0, label = "";
-                for(let j = 0; j < 5; j++) {
-                    const d = new Date(now); d.setDate(now.getDate() - (i * 5 + j));
-                    const ds = toDateStr(d);
-                    if (j === 0) label = ds.split('-').slice(2).join('.'); 
-                    chunkSum += db.filter(item => item.t === 'exp' && item.d === ds).reduce((a, b) => a + b.s, 0);
-                }
-                pointsData.push({ label, val: chunkSum });
-            }
-            const max = Math.max(...pointsData.map(p => p.val), 100) * 1.4;
-            const points = pointsData.map((p, i) => ({ x: 30 + i * 48, y: 130 - (p.val / max * 100) }));
-            let linePath = `M ${points[0].x} ${points[0].y}`;
-            for(let i = 1; i < points.length; i++) linePath += ` L ${points[i].x} ${points[i].y}`;
-            svg.innerHTML = `<defs><linearGradient id="mG" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="var(--blue)" stop-opacity="0.4"/><stop offset="100%" stop-color="var(--blue)" stop-opacity="0"/></linearGradient></defs>
-                <path d="${linePath} L ${points[5].x} 130 L ${points[0].x} 130 Z" fill="url(#mG)" />
-                <path d="${linePath}" fill="none" stroke="var(--blue)" stroke-width="3" stroke-linejoin="round"/>
-                ${points.map((p, i) => `<text x="${p.x}" y="${p.y - 12}" text-anchor="middle" fill="var(--main)" font-size="8" font-weight="800">${pointsData[i].val > 0 ? Math.round(pointsData[i].val) : ''}</text>
-                    <circle cx="${p.x}" cy="${p.y}" r="4" fill="var(--blue)"/><text x="${p.x}" y="148" text-anchor="middle" fill="var(--text)" font-size="9">${pointsData[i].label}</text>`).join('')}`;
+            const svg = document.getElementById('month-chart'); const monthSums = new Array(4).fill(0);
+            for(let i=0; i<4; i++) { monthSums[i] = db.filter(item => item.t === 'exp' && (new Date().getDate() - new Date(item.d).getDate() <= (i+1)*7)).reduce((a, b) => a + b.s, 0); }
+            const max = Math.max(...monthSums, 100) * 1.2; let points = monthSums.map((v, i) => `${30 + i*80},${130 - (v/max)*100}`).join(' ');
+            svg.innerHTML = `<polyline points="${points}" fill="none" stroke="var(--blue)" stroke-width="3" />`;
         }
 
-        function drawCharts() {
-            const slider = document.getElementById('chart-slider');
-            if (slider) slider.style.transform = `translateX(-${currentSlide * 100}%)`;
-            document.querySelectorAll('.dot').forEach((d, i) => d.classList.toggle('active', i === currentSlide));
-            renderDayChart(); renderWeekChart(); renderMonthChart();
-        }
+        function setMode(m) { mode = m; currentCat = cats[m][0].i; renderCats(); document.getElementById('btn-exp').style.background = m === 'exp' ? 'var(--blue)' : 'transparent'; document.getElementById('btn-inc').style.background = m === 'inc' ? 'var(--blue)' : 'transparent'; }
+        function renderCats() { const container = document.getElementById('cat-list'); container.innerHTML = cats[mode].map(c => `<div class="cat-item ${currentCat === c.i ? 'active' : ''}" onclick="currentCat='${c.i}'; renderCats();"><div class="cat-icon">${c.i}</div><span class="cat-name">${c.n}</span></div>`).join(''); }
+        function toggleBlur() { document.getElementById('bal').classList.toggle('blurred'); tg.HapticFeedback.impactOccurred('light'); }
 
         async function getRates() {
             try {
-                const btcR = await fetch('https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd');
-                const btcD = await btcR.json();
-                document.getElementById('btc-rate').innerText = '$' + btcD.bitcoin.usd.toLocaleString();
-                const rubR = await fetch('https://api.exchangerate-api.com/v4/latest/USD');
-                const rubD = await rubR.json();
-                document.getElementById('usd-rate').innerText = rubD.rates.RUB.toFixed(2) + '₽';
+                const btc = await (await fetch('https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd')).json();
+                document.getElementById('btc-rate').innerText = '$' + btc.bitcoin.usd.toLocaleString();
+                const rub = await (await fetch('https://api.exchangerate-api.com/v4/latest/USD')).json();
+                document.getElementById('usd-rate').innerText = rub.rates.RUB.toFixed(2) + '₽';
             } catch(e) {}
         }
 
-        window.onload = () => { 
-            document.getElementById('date-picker').valueAsDate = new Date();
-            tg.expand();
-            syncFromCloud();
-            getRates(); 
-        };
+        window.onload = () => { document.getElementById('date-picker').valueAsDate = new Date(); tg.expand(); syncFromCloud(); getRates(); };
     </script>
 </body>
 </html>
+
 
 
 
