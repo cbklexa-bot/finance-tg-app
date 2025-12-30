@@ -187,13 +187,13 @@
     <div id="p-ai" class="page">
         <div class="compact-header"><span style="font-weight: 800; color: var(--text);">FINANCE AI Ассистент</span></div>
         <div id="ai-chat" style="height: calc(100vh - 210px); overflow-y: auto; display: flex; flex-direction: column; gap: 10px; padding-bottom: 80px;">
-            <div class="ai-msg">Привет! Готов помочь с финансами. Нажми на микрофон, чтобы сказать сумму!</div>
+            <div class="ai-msg">Привет! Готов помочь. Скажи "Такси 500" и я сам отправлю!</div>
         </div>
         <div class="ai-controls">
             <button id="mic-btn" class="mic-btn" onclick="toggleVoice()">
                 <svg viewBox="0 0 24 24"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2M12 19v4M8 23h8"/></svg>
             </button>
-            <input type="text" id="ai-input" style="flex:1; background:none; border:none; color:var(--main); outline:none; font-size:14px;" placeholder="Задай вопрос или скажи...">
+            <input type="text" id="ai-input" style="flex:1; background:none; border:none; color:var(--main); outline:none; font-size:14px;" placeholder="Говорите...">
             <button class="send-btn" onclick="askAI()">
                 <svg viewBox="0 0 24 24"><line x1="22" y1="2" x2="11" y2="13"/><polyline points="22 2 15 22 11 13 2 9 22 2"/></svg>
             </button>
@@ -218,13 +218,13 @@
         let mode = 'exp', currentCat = '🛒', currentSlide = 0, touchStartX = 0, editingBudIdx = null, editingId = null;
         let isListening = false;
 
-        // ИНИЦИАЛИЗАЦИЯ ГОЛОСА
+        // ИНИЦИАЛИЗАЦИЯ ГОЛОСА (МГНОВЕННАЯ ОТПРАВКА)
         const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
         let recognition = null;
         if (SpeechRecognition) {
             recognition = new SpeechRecognition();
             recognition.lang = 'ru-RU';
-            recognition.interimResults = false;
+            recognition.interimResults = false; 
             
             recognition.onstart = () => {
                 isListening = true;
@@ -239,17 +239,28 @@
             
             recognition.onresult = (event) => {
                 const text = event.results[0][0].transcript;
-                document.getElementById('ai-input').value = text;
-                tg.HapticFeedback.notificationOccurred('success');
+                if (text.trim().length > 0) {
+                    document.getElementById('ai-input').value = text;
+                    tg.HapticFeedback.notificationOccurred('success');
+                    
+                    // МГНОВЕННАЯ ОТПРАВКА
+                    askAI();
+                }
+            };
+
+            recognition.onerror = (e) => {
+                isListening = false;
+                document.getElementById('mic-btn').classList.remove('active');
+                console.error("Speech Error:", e.error);
             };
         }
 
         function toggleVoice() {
-            if (!recognition) return alert("Голосовой ввод не поддерживается вашим устройством");
+            if (!recognition) return alert("Голосовой ввод не поддерживается");
             if (isListening) recognition.stop(); else recognition.start();
         }
 
-        // ОСТАЛЬНЫЕ ФУНКЦИИ (Оригинал)
+        // ОСТАЛЬНЫЕ ФУНКЦИИ
         const catColors = { '🛒':'#ff453a', '🚗':'#ff9f0a', '🏠':'#30d158', '🛍️':'#0a84ff', '💊':'#bf5af2', '🎁':'#ff375f', '🎭':'#64d2ff', '📦':'#a1a1aa', '💵':'#30d158', '📈':'#0a84ff' };
         const cats = {
             exp: [{n:'Продукты', i:'🛒'}, {n:'Авто', i:'🚗'}, {n:'Жилье', i:'🏠'}, {n:'Шопинг', i:'🛍️'}, {n:'Аптека', i:'💊'}, {n:'Подарки', i:'🎁'}, {n:'Отдых', i:'🎭'}, {n:'Прочее', i:'📦'}],
@@ -445,6 +456,8 @@
     </script>
 </body>
 </html>
+
+
 
 
 
