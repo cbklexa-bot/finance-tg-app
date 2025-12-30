@@ -75,6 +75,17 @@
         .h-item { display: flex; justify-content: space-between; align-items: center; padding: 14px; background: var(--card); border-radius: 20px; margin-bottom: 10px; border: 1px solid var(--border); }
         .h-amount { font-weight: 900; font-size: 16px; }
 
+        /* Стиль AI чата и управления */
+        #ai-chat::-webkit-scrollbar { width: 0; }
+        .ai-msg { background: var(--card); padding: 12px; border-radius: 18px 18px 18px 5px; border: 1px solid var(--border); max-width: 85%; font-size: 14px; line-height: 1.4; }
+        .user-msg { align-self: flex-end; background: var(--blue); color: white; padding: 12px; border-radius: 18px 18px 5px 18px; max-width: 85%; font-size: 14px; }
+        
+        .ai-controls { position: fixed; bottom: 85px; left: 15px; right: 15px; display: flex; align-items: center; gap: 8px; background: var(--card); padding: 8px 12px; border-radius: 24px; border: 1px solid var(--border); z-index: 100; }
+        .icon-btn { background: none; border: none; padding: 6px; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: transform 0.1s; }
+        .icon-btn:active { transform: scale(0.9); }
+        .icon-btn svg { width: 22px; height: 22px; stroke: var(--text); fill: none; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
+        .send-btn svg { stroke: var(--blue); }
+
         .nav { position: fixed; bottom: 0; width: 100%; display: flex; padding-bottom: env(safe-area-inset-bottom, 15px); z-index: 1000; transition: 0.3s; background: var(--glass); backdrop-filter: blur(20px); border-top: 0.5px solid var(--border); }
         .n-item { flex: 1; text-align: center; padding: 12px 0; color: var(--text); font-size: 10px; font-weight: 700; text-transform: uppercase; }
         .n-item.active { color: var(--blue); }
@@ -162,10 +173,30 @@
         <div id="budget-list"></div>
     </div>
 
+    <div id="p-ai" class="page">
+        <div class="compact-header">
+            <span style="font-weight: 800; color: var(--text);">FINANCE AI Ассистент</span>
+        </div>
+        <div id="ai-chat" style="height: calc(100vh - 280px); overflow-y: auto; display: flex; flex-direction: column; gap: 10px; padding-bottom: 20px;">
+            <div class="ai-msg">Привет! Нажми на микрофон, чтобы продиктовать расход, или просто напиши мне.</div>
+        </div>
+        
+        <div class="ai-controls">
+            <button class="icon-btn" onclick="startVoice()">
+                <svg viewBox="0 0 24 24"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>
+            </button>
+            <input type="text" id="ai-input" style="flex:1; background:none; border:none; color:var(--main); outline:none; font-size:15px;" placeholder="Задай вопрос...">
+            <button class="icon-btn send-btn" onclick="askAI()">
+                <svg viewBox="0 0 24 24" style="transform: rotate(45deg);"><line x1="22" y1="2" x2="11" y2="13"/><polyline points="22 2 15 22 11 13 2 9 22 2"/></svg>
+            </button>
+        </div>
+    </div>
+
     <nav class="nav">
         <div class="n-item active" id="n-home" onclick="go('home')"><svg viewBox="0 0 24 24"><path d="M3 9.5L12 3l9 6.5V20a1 1 0 01-1 1h-5v-7h-4v7H4a1 1 0 01-1-1V9.5z"/></svg>Главная</div>
         <div class="n-item" id="n-an" onclick="go('an')"><svg viewBox="0 0 24 24"><path d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>История</div>
         <div class="n-item" id="n-bud" onclick="go('bud')"><svg viewBox="0 0 24 24"><path d="M9 7h6m-6 4h6m-6 4h6M5 21h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v14a2 2 0 002 2z"/></svg>Бюджет</div>
+        <div class="n-item" id="n-ai" onclick="go('ai')"><svg viewBox="0 0 24 24"><path d="M12 2a10 10 0 00-7.74 16.33l-1.13 3.38a1 1 0 001.26 1.26l3.38-1.13A10 10 0 1012 2z"/></svg>AI</div>
     </nav>
 
     <script>
@@ -360,6 +391,44 @@
                 const rub = await (await fetch('https://api.exchangerate-api.com/v4/latest/USD')).json();
                 document.getElementById('usd-rate').innerText = rub.rates.RUB.toFixed(2) + '₽';
             } catch(e) {}
+        }
+
+        function startVoice() {
+            tg.HapticFeedback.impactOccurred('medium');
+            const input = document.getElementById('ai-input');
+            input.placeholder = "Слушаю...";
+            setTimeout(() => { input.placeholder = "Задай вопрос..."; }, 3000);
+        }
+
+        async function askAI() {
+            const input = document.getElementById('ai-input');
+            const chat = document.getElementById('ai-chat');
+            const query = input.value.trim();
+            if (!query) return;
+
+            chat.innerHTML += `<div class="user-msg">${query}</div>`;
+            input.value = '';
+            chat.scrollTop = chat.scrollHeight;
+
+            const botMsgId = 'msg-' + Date.now();
+            chat.innerHTML += `<div id="${botMsgId}" class="ai-msg">Анализирую данные...</div>`;
+            
+            setTimeout(() => {
+                let response = "Я пока учусь, но уже вижу твои записи! Попробуй спросить о расходах на продукты.";
+                const lowerQuery = query.toLowerCase();
+
+                if (lowerQuery.includes('еду') || lowerQuery.includes('продукты') || lowerQuery.includes('🛒')) {
+                    const foodExp = db.filter(i => i.c === '🛒').reduce((a, b) => a + b.s, 0);
+                    response = foodExp > 0 ? `На продукты (🛒) ты уже потратил ${foodExp.toLocaleString()} ₽.` : "Записей о покупке продуктов пока нет.";
+                } else if (lowerQuery.includes('баланс') || lowerQuery.includes('сколько денег')) {
+                    const total = db.reduce((a,i) => a + (i.t === 'inc' ? i.s : -i.s), 0);
+                    response = `Твой текущий баланс составляет ${total.toLocaleString()} ₽.`;
+                }
+
+                document.getElementById(botMsgId).innerText = response;
+                chat.scrollTop = chat.scrollHeight;
+                tg.HapticFeedback.selectionChanged();
+            }, 800);
         }
 
         window.onload = () => { document.getElementById('date-picker').valueAsDate = new Date(); tg.expand(); syncFromCloud(); getRates(); };
