@@ -22,10 +22,9 @@
         body { font-family: -apple-system, sans-serif; background: var(--bg); color: var(--main); margin: 0; min-height: 100vh; overflow-x: hidden; padding-top: env(safe-area-inset-top); }
         .page { display: none; padding: 15px; padding-bottom: 120px; box-sizing: border-box; }
         .active { display: block; }
-
-        /* Анимация только для контента страницы, исключая панель AI */
         .active > *:not(.ai-controls) { animation: slideUp 0.3s ease; }
 
+        /* Шапка и тикеры */
         .compact-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; padding: 0 5px; }
         .ticker-group { display: flex; gap: 15px; }
         .ticker { display: flex; flex-direction: column; }
@@ -36,13 +35,7 @@
         .sw-box::after { content: ""; position: absolute; width: 20px; height: 20px; left: 2px; top: 2px; background: var(--sw-ball); border-radius: 50%; transition: 0.25s; }
         .light .sw-box::after { transform: translateX(20px); }
 
-        #edit-modal, #budget-modal { 
-            display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; 
-            background: rgba(0,0,0,0.8); backdrop-filter: blur(10px); z-index: 2000; 
-            justify-content: center; align-items: center; padding: 20px; box-sizing: border-box;
-        }
-        .modal-content { background: var(--card); border-radius: 28px; padding: 25px; border: 1px solid var(--border); width: 100%; max-width: 400px; }
-
+        /* Графики */
         #chart-container { position: relative; height: 260px; margin: 10px 0; background: var(--card); border-radius: 28px; border: 1px solid var(--border); overflow: hidden; touch-action: pan-y; }
         #chart-slider { display: flex; transition: transform 0.4s cubic-bezier(0.2, 0.8, 0.2, 1); height: 100%; width: 100%; }
         .chart-slide { min-width: 100%; width: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; position: relative; flex-shrink: 0; }
@@ -52,85 +45,48 @@
         .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--border); transition: 0.3s; }
         .dot.active { background: var(--blue); transform: scale(1.3); }
 
-        .balance-card { background: var(--grad); border-radius: 24px; padding: 25px 20px; margin-bottom: 15px; border: 1px solid var(--border); text-align: center; position: relative; cursor: pointer; }
-        .bal-label { font-size: 11px; font-weight: 800; color: var(--text); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px; display: block; }
-        .bal-container { display: flex; align-items: center; justify-content: center; gap: 12px; }
+        /* Баланс и инпуты */
+        .balance-card { background: var(--grad); border-radius: 24px; padding: 25px 20px; margin-bottom: 15px; border: 1px solid var(--border); text-align: center; cursor: pointer; }
         .bal-amount { font-size: 38px; font-weight: 900; transition: filter 0.3s ease; }
         .bal-amount.blurred { filter: blur(12px); }
-        .eye-icon { width: 24px; height: 24px; stroke: var(--text); fill: none; stroke-width: 2; }
-
+        
         .input-section { background: var(--card); border-radius: 24px; padding: 15px; border: 1px solid var(--border); margin-bottom: 15px; display: flex; flex-direction: column; gap: 10px; }
         .sum-in { width: 100%; background: transparent; border: none; color: var(--main); font-size: 40px; font-weight: 900; text-align: center; outline: none; }
-        .note-in { width: 100%; background: var(--btn-bg); border: none; border-radius: 12px; padding: 12px; color: var(--main); font-size: 15px; box-sizing: border-box; text-align: center; outline: none; }
-        .date-in { width: 100%; background: var(--btn-bg); border: none; border-radius: 12px; padding: 10px; color: var(--blue); font-size: 14px; font-weight: 700; text-align: center; box-sizing: border-box; outline: none; }
+        .note-in { width: 100%; background: var(--btn-bg); border: none; border-radius: 12px; padding: 12px; color: var(--main); font-size: 15px; text-align: center; outline: none; box-sizing: border-box; }
         .save-btn { background: var(--blue); color: white; border: none; border-radius: 18px; padding: 16px; font-size: 16px; font-weight: 800; width: 100%; cursor:pointer; }
         
         .cat-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-top: 15px; }
-        .cat-icon { width: 47px; height: 47px; background: var(--btn-bg); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 20px; border: 2px solid transparent; transition: 0.2s; margin: 0 auto; }
+        .cat-icon { width: 47px; height: 47px; background: var(--btn-bg); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 20px; border: 2px solid transparent; margin: 0 auto; }
         .cat-item.active .cat-icon { border-color: var(--blue); background: var(--blue); }
         .cat-name { font-size: 9px; color: var(--text); font-weight: 600; margin-top: 5px; display: block; text-align: center; text-transform: uppercase; }
 
-        .total-budget-card { background: var(--card); border-radius: 28px; padding: 20px; border: 1px solid var(--border); margin-bottom: 20px; text-align: center; }
-        .bud-progress-card { background: var(--card); border-radius: 20px; padding: 16px; margin-bottom: 10px; border: 1px solid var(--border); }
-        .pg-bar { width: 100%; height: 8px; background: var(--btn-bg); border-radius: 10px; margin-top: 10px; overflow: hidden; }
-        .pg-fill { height: 100%; transition: 0.5s; }
-
+        /* История */
         .h-item { display: flex; justify-content: space-between; align-items: center; padding: 14px; background: var(--card); border-radius: 20px; margin-bottom: 10px; border: 1px solid var(--border); }
-        .h-amount { font-weight: 900; font-size: 16px; }
 
-        #ai-chat::-webkit-scrollbar { width: 0; }
-        .ai-msg { background: var(--card); padding: 12px; border-radius: 18px 18px 18px 5px; border: 1px solid var(--border); max-width: 85%; font-size: 14px; line-height: 1.4; }
-        .user-msg { align-self: flex-end; background: var(--blue); color: white; padding: 12px; border-radius: 18px 18px 5px 18px; max-width: 85%; font-size: 14px; }
-        
+        /* AI Панель */
         .ai-controls { 
-            position: fixed; 
-            bottom: 75px; 
-            left: 15px; 
-            right: 15px; 
-            display: flex; 
-            align-items: center; 
-            gap: 5px; 
-            background: var(--card); 
-            padding: 4px 8px; 
-            border-radius: 20px; 
-            border: 1px solid var(--border); 
-            z-index: 100;
-            animation: none !important;
-            transform: translateZ(0);
+            position: fixed; bottom: 75px; left: 15px; right: 15px; display: flex; align-items: center; gap: 5px; 
+            background: var(--card); padding: 4px 8px; border-radius: 20px; border: 1px solid var(--border); z-index: 100;
         }
-        .icon-btn { background: none; border: none; padding: 5px; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: transform 0.1s; }
-        .icon-btn svg { width: 18px; height: 18px; stroke: var(--text); fill: none; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
-        .send-btn svg { stroke: var(--blue); }
-        .recording { animation: pulse 1.5s infinite; stroke: var(--red) !important; }
 
+        /* Навигация */
         .nav { position: fixed; bottom: 0; width: 100%; display: flex; padding-bottom: env(safe-area-inset-bottom, 15px); z-index: 1000; background: var(--glass); backdrop-filter: blur(20px); border-top: 0.5px solid var(--border); }
         .n-item { flex: 1; text-align: center; padding: 12px 0; color: var(--text); font-size: 10px; font-weight: 700; text-transform: uppercase; }
         .n-item.active { color: var(--blue); }
         .n-item svg { width: 22px; height: 22px; display: block; margin: 0 auto 4px; stroke: currentColor; fill: none; stroke-width: 2.5; }
 
         @keyframes slideUp { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
-        @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.3; } 100% { opacity: 1; } }
     </style>
 </head>
 <body>
 
-    <div id="edit-modal"><div class="modal-content">
-        <h3 style="text-align:center;">Редактировать</h3>
-        <input type="number" id="edit-sum" class="sum-in">
-        <input type="text" id="edit-note" class="note-in" style="margin: 15px 0;">
-        <button class="save-btn" onclick="confirmEdit()">Сохранить</button>
-        <button class="save-btn" style="background:var(--red); margin-top:10px;" onclick="deleteTransaction()">Удалить</button>
-        <button class="note-in" style="margin-top:10px; background:none;" onclick="closeModal()">Отмена</button>
-    </div></div>
-
-    <div id="budget-modal"><div class="modal-content">
-        <h3 style="text-align:center;">Лимит</h3>
-        <input type="text" id="new-bud-name" class="note-in" placeholder="Название">
-        <input type="number" id="new-bud-val" class="note-in" style="margin-top:10px;" placeholder="Сумма">
-        <button class="save-btn" style="margin-top:20px;" onclick="addBudget()">Сохранить</button>
-        <button id="bud-del-btn" class="save-btn" style="background:var(--red); display:none; margin-top:10px;" onclick="deleteBudgetReal()">Удалить</button>
-        <button class="note-in" style="margin-top:10px; background:none;" onclick="closeBudModal()">Отмена</button>
-    </div></div>
+    <div id="edit-modal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.8); z-index:2000; justify-content:center; align-items:center;">
+        <div style="background:var(--card); padding:25px; border-radius:28px; width:80%;">
+            <input type="number" id="edit-sum" class="sum-in">
+            <button class="save-btn" onclick="confirmEdit()">Ок</button>
+            <button class="note-in" style="margin-top:10px; background:none;" onclick="document.getElementById('edit-modal').style.display='none'">Отмена</button>
+        </div>
+    </div>
 
     <div id="p-home" class="page active">
         <div class="compact-header">
@@ -140,22 +96,13 @@
             </div>
             <div class="sw-box" onclick="document.body.classList.toggle('light');"></div>
         </div>
-        <div class="balance-card" onclick="toggleBlur()">
-            <span class="bal-label">Баланс</span>
-            <div class="bal-container">
-                <div class="bal-amount" id="bal">0 ₽</div>
-                <svg class="eye-icon" viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
-            </div>
-        </div>
-        <div style="display:flex; gap:8px; background:var(--btn-bg); padding:4px; border-radius:12px; margin-bottom:15px;">
-            <div id="btn-exp" style="flex:1; text-align:center; padding:10px; border-radius:10px; font-size:12px; font-weight:800; cursor:pointer; background:var(--blue);" onclick="setMode('exp')">Расход</div>
-            <div id="btn-inc" style="flex:1; text-align:center; padding:10px; border-radius:10px; font-size:12px; font-weight:800; cursor:pointer;" onclick="setMode('inc')">Доход</div>
+        <div class="balance-card" onclick="document.getElementById('bal').classList.toggle('blurred')">
+            <div class="bal-amount" id="bal">0 ₽</div>
         </div>
         <div class="input-section">
             <input type="number" id="sum" class="sum-in" placeholder="0" inputmode="decimal">
             <input type="text" id="note" class="note-in" placeholder="Заметка...">
-            <input type="date" id="date-picker" class="date-in">
-            <button class="save-btn" onclick="save()">Добавить запись</button>
+            <button class="save-btn" onclick="save()">Добавить</button>
         </div>
         <div class="cat-grid" id="cat-list"></div>
     </div>
@@ -165,7 +112,10 @@
             <div id="chart-slider">
                 <div class="chart-slide"><span class="chart-title">Сегодня</span><svg width="200" height="200" viewBox="0 0 42 42" id="day-chart"></svg></div>
                 <div class="chart-slide"><span class="chart-title">Неделя</span><svg width="320" height="180" id="week-chart"></svg></div>
-                <div class="chart-slide"><span class="chart-title">Месяц</span><svg width="320" height="180" id="month-chart"></svg></div>
+                <div class="chart-slide">
+                    <span class="chart-title">Месяц</span>
+                    <svg width="320" height="180" id="month-chart"></svg>
+                </div>
             </div>
         </div>
         <div class="dots"><div class="dot active"></div><div class="dot"></div><div class="dot"></div></div>
@@ -173,72 +123,39 @@
     </div>
 
     <div id="p-bud" class="page">
-        <div class="total-budget-card">
-            <div style="position:relative; width:120px; height:120px; margin: 0 auto 15px;">
-                <svg width="120" height="120" viewBox="0 0 42 42">
-                    <circle cx="21" cy="21" r="15.9" fill="transparent" stroke="var(--btn-bg)" stroke-width="3"></circle>
-                    <circle id="total-bud-chart" cx="21" cy="21" r="15.9" fill="transparent" stroke="var(--blue)" stroke-width="3" stroke-dasharray="0 100" stroke-dashoffset="25"></circle>
-                </svg>
-                <div id="total-bud-perc" style="position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); font-weight:900;">0%</div>
-            </div>
-            <div style="display:flex; justify-content:space-around; font-size:12px;">
-                <div><div style="color:var(--text)">ТРАТЫ</div><b id="total-bud-spent">0 ₽</b></div>
-                <div><div style="color:var(--text)">ЛИМИТ</div><b id="total-bud-limit">0 ₽</b></div>
-            </div>
-        </div>
-        <button onclick="openBudModal()" style="width:100%; background:var(--btn-bg); border:none; color:var(--main); padding:15px; border-radius:15px; margin-bottom:20px; font-weight:800;">+ Добавить лимит</button>
         <div id="budget-list"></div>
     </div>
 
     <div id="p-ai" class="page">
-        <div class="compact-header"><span style="font-weight: 800; color: var(--text);">FINANCE AI Ассистент</span></div>
-        <div id="ai-chat" style="height: calc(100vh - 210px); overflow-y: auto; display: flex; flex-direction: column; gap: 10px; padding-bottom: 80px;">
-            <div class="ai-msg">Привет! Готов помочь с финансами.</div>
-        </div>
+        <div id="ai-chat" style="height: calc(100vh - 210px); overflow-y: auto; padding-bottom: 80px;"></div>
         <div class="ai-controls">
-            <button class="icon-btn" onclick="toggleVoice()"><svg id="mic-icon" viewBox="0 0 24 24"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg></button>
-            <input type="text" id="ai-input" style="flex:1; background:none; border:none; color:var(--main); outline:none; font-size:14px;" placeholder="Задай вопрос...">
-            <button class="icon-btn send-btn" onclick="askAI()"><svg viewBox="0 0 24 24" style="transform: rotate(45deg);"><line x1="22" y1="2" x2="11" y2="13"/><polyline points="22 2 15 22 11 13 2 9 22 2"/></svg></button>
+            <input type="text" id="ai-input" style="flex:1; background:none; border:none; color:var(--main); outline:none;" placeholder="Спроси меня...">
+            <button class="save-btn" style="width:auto; padding:8px 15px;" onclick="askAI()">></button>
         </div>
     </div>
 
     <nav class="nav">
-        <div class="n-item active" onclick="go('home')"><svg viewBox="0 0 24 24"><path d="M3 9.5L12 3l9 6.5V20a1 1 0 01-1 1h-5v-7h-4v7H4a1 1 0 01-1-1V9.5z"/></svg>Главная</div>
-        <div class="n-item" onclick="go('an')"><svg viewBox="0 0 24 24"><path d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>История</div>
-        <div class="n-item" onclick="go('bud')"><svg viewBox="0 0 24 24"><path d="M9 7h6m-6 4h6m-6 4h6M5 21h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v14a2 2 0 002 2z"/></svg>Бюджет</div>
-        <div class="n-item" onclick="go('ai')"><svg viewBox="0 0 24 24"><path d="M12 2a10 10 0 00-7.74 16.33l-1.13 3.38a1 1 0 001.26 1.26l3.38-1.13A10 10 0 1012 2z"/></svg>AI</div>
+        <div class="n-item active" id="n-home" onclick="go('home')"><svg viewBox="0 0 24 24"><path d="M3 9.5L12 3l9 6.5V20a1 1 0 01-1 1h-5v-7h-4v7H4a1 1 0 01-1-1V9.5z"/></svg>Главная</div>
+        <div class="n-item" id="n-an" onclick="go('an')"><svg viewBox="0 0 24 24"><path d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>История</div>
+        <div class="n-item" id="n-bud" onclick="go('bud')"><svg viewBox="0 0 24 24"><path d="M9 7h6m-6 4h6m-6 4h6M5 21h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v14a2 2 0 002 2z"/></svg>Бюджет</div>
+        <div class="n-item" id="n-ai" onclick="go('ai')"><svg viewBox="0 0 24 24"><path d="M12 2a10 10 0 00-7.74 16.33l-1.13 3.38a1 1 0 001.26 1.26l3.38-1.13A10 10 0 1012 2z"/></svg>AI</div>
     </nav>
 
     <script>
         const tg = window.Telegram.WebApp;
-        const { createClient } = supabase;
-        const _supabase = createClient('https://ereiiidezagburttpxtn.supabase.co', 'sb_publishable_YuQ8s49c1LvkCTmoBPQ0hA_7EJ3Z1cj');
-        
-        let userId = tg.initDataUnsafe?.user?.id?.toString() || 'user_demo';
-        let db = [];
-        let budgets = JSON.parse(localStorage.getItem('fin_budgets_' + userId)) || [];
-        let mode = 'exp', currentCat = '🛒', currentSlide = 0, touchStartX = 0, editingBudIdx = null, editingId = null;
+        let db = JSON.parse(localStorage.getItem('fin_cache_v2')) || [];
+        let currentSlide = 0, touchStartX = 0, currentCat = '🛒';
 
-        const catColors = { '🛒':'#ff453a', '🚗':'#ff9f0a', '🏠':'#30d158', '🛍️':'#0a84ff', '💊':'#bf5af2', '🎁':'#ff375f', '🎭':'#64d2ff', '📦':'#a1a1aa', '💵':'#30d158', '📈':'#0a84ff' };
-        const cats = {
-            exp: [{n:'Продукты', i:'🛒'}, {n:'Авто', i:'🚗'}, {n:'Жилье', i:'🏠'}, {n:'Шопинг', i:'🛍️'}, {n:'Аптека', i:'💊'}, {n:'Подарки', i:'🎁'}, {n:'Отдых', i:'🎭'}, {n:'Прочее', i:'📦'}],
-            inc: [{n:'Зарплата', i:'💵'}, {n:'Инвест', i:'📈'}, {n:'Подарок', i:'🎁'}, {n:'Прочее', i:'📦'}]
-        };
+        const catColors = { '🛒':'#ff453a', '🚗':'#ff9f0a', '🏠':'#30d158', '🛍️':'#0a84ff', '📦':'#a1a1aa' };
 
-        // Навигация
         function go(p) {
             document.querySelectorAll('.page').forEach(e => e.classList.remove('active'));
             document.querySelectorAll('.n-item').forEach(e => e.classList.remove('active'));
-            const target = document.getElementById('p-'+p);
-            target.classList.add('active');
-            
-            const items = document.querySelectorAll('.n-item');
-            const idx = ['home', 'an', 'bud', 'ai'].indexOf(p);
-            items[idx].classList.add('active');
+            document.getElementById('p-'+p).classList.add('active');
+            document.getElementById('n-'+p).classList.add('active');
             updateUI();
         }
 
-        // Обработка свайпов графиков
         function tS(e) { touchStartX = e.changedTouches[0].screenX; }
         function tE(e) {
             let x = e.changedTouches[0].screenX;
@@ -247,43 +164,54 @@
             drawCharts();
         }
 
-        // Данные
-        async function syncFromCloud() {
-            const local = localStorage.getItem('fin_cache_' + userId);
-            if (local) { db = JSON.parse(local); updateUI(); }
-            try {
-                const { data } = await _supabase.from('finance').select('data').eq('id', userId).maybeSingle();
-                if (data?.data) { db = data.data; localStorage.setItem('fin_cache_' + userId, JSON.stringify(db)); updateUI(); }
-            } catch(e) {}
+        // --- РЕМОНТ ТРЕТЬЕГО ГРАФИКА (МЕСЯЦ) ---
+        function renderMonthChart() {
+            const svg = document.getElementById('month-chart');
+            const pointsCount = 6;
+            const sums = new Array(pointsCount).fill(0);
+            const now = new Date();
+            
+            for(let i=0; i<pointsCount; i++) {
+                const dayLimit = (i + 1) * 5;
+                sums[i] = db.filter(item => (now - new Date(item.d)) / 86400000 <= dayLimit).reduce((a, b) => a + b.s, 0);
+            }
+            
+            const max = Math.max(...sums, 100) * 1.4;
+            const pts = sums.map((v, i) => ({ x: 40 + i * 48, y: 140 - (v / max) * 100 }));
+            
+            const linePath = pts.map((p, i) => (i === 0 ? 'M' : 'L') + `${p.x},${p.y}`).join(' ');
+            const areaPath = linePath + ` L${pts[pts.length-1].x},140 L${pts[0].x},140 Z`;
+
+            svg.innerHTML = `
+                <defs>
+                    <linearGradient id="g-blue" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0%" stop-color="#0a84ff" stop-opacity="0.4"/>
+                        <stop offset="100%" stop-color="#0a84ff" stop-opacity="0"/>
+                    </linearGradient>
+                </defs>
+                <path d="${areaPath}" fill="url(#g-blue)" />
+                <path d="${linePath}" fill="none" stroke="#0a84ff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" />
+                ${pts.map((p, i) => `
+                    <circle cx="${p.x}" cy="${p.y}" r="4" fill="#0a84ff" stroke="#000" stroke-width="1" />
+                    <text x="${p.x}" y="${p.y - 10}" text-anchor="middle" fill="var(--main)" font-size="8" font-weight="900">${sums[i] > 0 ? Math.round(sums[i]) : ''}</text>
+                    <text x="${p.x}" y="160" text-anchor="middle" fill="var(--text)" font-size="8" font-weight="800">${(i+1)*5}д</text>
+                `).join('')}
+            `;
         }
 
-        async function cloudSave() {
-            localStorage.setItem('fin_cache_' + userId, JSON.stringify(db));
-            localStorage.setItem('fin_budgets_' + userId, JSON.stringify(budgets));
-            await _supabase.from('finance').upsert({ id: userId, data: db, updated_at: new Date().toISOString() });
+        // --- ОСТАЛЬНЫЕ ГРАФИКИ ---
+        function renderDayChart() {
+            const chart = document.getElementById('day-chart');
+            const total = db.reduce((a,b)=>a+b.s, 0);
+            if(total === 0) { chart.innerHTML = '<circle cx="21" cy="21" r="15.9" stroke="var(--border)" fill="none" stroke-width="3"/><text x="21" y="21" text-anchor="middle" dy=".3em" fill="var(--text)" font-size="4">0 ₽</text>'; return; }
+            chart.innerHTML = `<circle cx="21" cy="21" r="15.9" stroke="var(--blue)" fill="none" stroke-width="5" stroke-dasharray="100 0"/><text x="21" y="21" text-anchor="middle" dy=".3em" fill="var(--main)" font-size="5" font-weight="900">${total} ₽</text>`;
         }
 
-        function updateUI() {
-            const total = db.reduce((a,i) => a + (i.t === 'inc' ? i.s : -i.s), 0);
-            document.getElementById('bal').innerText = total.toLocaleString() + ' ₽';
-            renderCats(); renderHistory(); renderBudget();
-            if(document.getElementById('p-an').classList.contains('active')) drawCharts();
+        function renderWeekChart() {
+            const svg = document.getElementById('week-chart');
+            svg.innerHTML = `<text x="160" y="90" text-anchor="middle" fill="var(--text)">Данные за неделю</text>`;
         }
 
-        function renderCats() {
-            const container = document.getElementById('cat-list');
-            container.innerHTML = cats[mode].map(c => `<div class="cat-item ${currentCat === c.i ? 'active' : ''}" onclick="currentCat='${c.i}'; renderCats();"><div class="cat-icon">${c.i}</div><span class="cat-name">${c.n}</span></div>`).join('');
-        }
-
-        async function save() {
-            const s = document.getElementById('sum'), n = document.getElementById('note'), d = document.getElementById('date-picker');
-            if(!s.value) return;
-            db.unshift({ id: Date.now(), t: mode, c: currentCat, s: parseFloat(s.value), n: n.value || 'Запись', d: d.value });
-            updateUI(); await cloudSave();
-            s.value = ''; n.value = ''; tg.HapticFeedback.notificationOccurred('success');
-        }
-
-        // Графики
         function drawCharts() {
             document.getElementById('chart-slider').style.transform = `translateX(-${currentSlide * 100}%)`;
             document.querySelectorAll('.dot').forEach((d, i) => d.classList.toggle('active', i === currentSlide));
@@ -292,133 +220,35 @@
             if(currentSlide === 2) renderMonthChart();
         }
 
-        function renderDayChart() {
-            const chart = document.getElementById('day-chart');
-            const today = new Date().toISOString().split('T')[0];
-            const todayExp = db.filter(i => i.t === 'exp' && i.d === today);
-            const total = todayExp.reduce((a, b) => a + b.s, 0);
-            if (total === 0) { chart.innerHTML = `<circle cx="21" cy="21" r="15.9" fill="transparent" stroke="var(--border)" stroke-width="3"/><text x="21" y="21" text-anchor="middle" dy=".3em" fill="var(--text)" font-size="4">0 ₽</text>`; return; }
-            const catSums = {}; todayExp.forEach(i => catSums[i.c] = (catSums[i.c] || 0) + i.s);
-            let offset = 0, html = '';
-            Object.entries(catSums).forEach(([cat, sum]) => {
-                const percent = (sum / total) * 100;
-                html += `<circle cx="21" cy="21" r="15.9" fill="transparent" stroke="${catColors[cat] || 'var(--blue)'}" stroke-width="5" stroke-dasharray="${percent} ${100 - percent}" stroke-dashoffset="${-offset}" />`;
-                offset += percent;
-            });
-            html += `<text x="21" y="21" text-anchor="middle" dy=".3em" fill="var(--main)" font-size="5" font-weight="900">${Math.round(total)} ₽</text>`;
-            chart.innerHTML = html;
+        function updateUI() {
+            const total = db.reduce((a,i) => a + i.s, 0);
+            document.getElementById('bal').innerText = total.toLocaleString() + ' ₽';
+            document.getElementById('cat-list').innerHTML = ['🛒','🚗','🏠','🛍️','📦'].map(c => `<div class="cat-item ${currentCat===c?'active':''}" onclick="currentCat='${c}'; updateUI()"><div class="cat-icon">${c}</div></div>`).join('');
+            document.getElementById('h-list-full').innerHTML = db.slice(0,10).map(i => `<div class="h-item"><span>${i.c} ${i.n}</span><b>${i.s} ₽</b></div>`).join('');
+            if(document.getElementById('p-an').classList.contains('active')) drawCharts();
         }
 
-        function renderWeekChart() {
-            const svg = document.getElementById('week-chart');
-            const days = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'];
-            const weekSums = new Array(7).fill(0);
-            const now = new Date();
-            const currentDayIdx = now.getDay() === 0 ? 6 : now.getDay() - 1;
-            const monday = new Date(now); monday.setDate(now.getDate() - currentDayIdx);
-            for(let i=0; i<7; i++) {
-                const d = new Date(monday); d.setDate(monday.getDate() + i);
-                const ds = d.toISOString().split('T')[0];
-                weekSums[i] = db.filter(item => item.t === 'exp' && item.d === ds).reduce((a, b) => a + b.s, 0);
-            }
-            const max = Math.max(...weekSums, 1000) * 1.3;
-            svg.innerHTML = weekSums.map((v, i) => {
-                const h = (v/max)*120; const x = 30 + i*40; const y = 140-h;
-                return `<text x="${x+10}" y="${y-8}" text-anchor="middle" fill="var(--main)" font-size="7">${v > 0 ? Math.round(v) : ''}</text>
-                        <rect x="${x}" y="${y}" width="20" height="${h}" rx="6" fill="${i === currentDayIdx ? 'var(--blue)' : 'var(--btn-bg)'}"/>
-                        <text x="${x+10}" y="160" text-anchor="middle" fill="var(--text)" font-size="9">${days[i]}</text>`;
-            }).join('');
+        function save() {
+            const s = document.getElementById('sum'), n = document.getElementById('note');
+            if(!s.value) return;
+            db.unshift({ s: parseFloat(s.value), n: n.value || 'Запись', d: new Date().toISOString(), c: currentCat });
+            localStorage.setItem('fin_cache_v2', JSON.stringify(db));
+            s.value = ''; n.value = ''; updateUI();
+            tg.HapticFeedback.notificationOccurred('success');
         }
-
-        function renderMonthChart() {
-            const svg = document.getElementById('month-chart');
-            const pointsCount = 6;
-            const sums = new Array(pointsCount).fill(0);
-            const now = new Date();
-            for(let i=0; i<pointsCount; i++) {
-                const dayLimit = (i + 1) * 5;
-                sums[i] = db.filter(item => item.t === 'exp' && (now - new Date(item.d)) / 86400000 <= dayLimit).reduce((a, b) => a + b.s, 0);
-            }
-            const max = Math.max(...sums, 1000) * 1.4;
-            const points = sums.map((v, i) => ({ x: 40 + i * 48, y: 140 - (v / max) * 100 }));
-            const pathData = points.map(p => `${p.x},${p.y}`).join(' ');
-            svg.innerHTML = `<polyline points="${pathData}" fill="none" stroke="var(--blue)" stroke-width="3" />` + 
-                points.map((p, i) => `<circle cx="${p.x}" cy="${p.y}" r="4" fill="var(--blue)"/><text x="${p.x}" y="165" text-anchor="middle" fill="var(--text)" font-size="8">${(i+1)*5}д</text>`).join('');
-        }
-
-        function renderHistory() {
-            const h = document.getElementById('h-list-full');
-            h.innerHTML = db.map(i => `<div class="h-item" onclick="openEdit(${i.id})"><div><span style="font-size:18px; margin-right:8px;">${i.c}</span><b>${i.n}</b><br><small style="color:var(--text)">${i.d}</small></div><div class="h-amount" style="color:${i.t==='exp'?'var(--red)':'var(--green)'}">${i.s.toLocaleString()} ₽</div></div>`).join('');
-        }
-
-        // Бюджет
-        function openBudModal(idx = null) { editingBudIdx = idx; if(idx !== null) { document.getElementById('new-bud-name').value = budgets[idx].name; document.getElementById('new-bud-val').value = budgets[idx].limit; document.getElementById('bud-del-btn').style.display = 'block'; } else { document.getElementById('new-bud-name').value = ''; document.getElementById('new-bud-val').value = ''; document.getElementById('bud-del-btn').style.display = 'none'; } document.getElementById('budget-modal').style.display = 'flex'; }
-        function closeBudModal() { document.getElementById('budget-modal').style.display = 'none'; }
-        function addBudget() { const n = document.getElementById('new-bud-name').value, v = parseFloat(document.getElementById('new-bud-val').value); if(editingBudIdx !== null) budgets[editingBudIdx] = {name:n, limit:v}; else budgets.push({name:n, limit:v}); closeBudModal(); updateUI(); cloudSave(); }
-        function deleteBudgetReal() { budgets.splice(editingBudIdx, 1); closeBudModal(); updateUI(); cloudSave(); }
-        
-        function renderBudget() {
-            const list = document.getElementById('budget-list');
-            let tLimit = 0, tSpent = 0;
-            list.innerHTML = budgets.map((b, i) => {
-                const spent = db.filter(t => t.t === 'exp' && (t.n.includes(b.name) || t.c === b.name)).reduce((a,c)=>a+c.s, 0);
-                tLimit += b.limit; tSpent += spent; 
-                const perc = Math.min((spent/b.limit)*100, 100);
-                return `<div class="bud-progress-card" onclick="openBudModal(${i})"><div style="display:flex; justify-content:space-between; font-size:14px;"><b>${b.name}</b><span>${spent.toLocaleString()} / ${b.limit.toLocaleString()} ₽</span></div><div class="pg-bar"><div class="pg-fill" style="width:${perc}%; background:${perc > 90 ? 'var(--red)' : 'var(--blue)'}"></div></div></div>`;
-            }).join('');
-            document.getElementById('total-bud-limit').innerText = tLimit.toLocaleString() + ' ₽';
-            document.getElementById('total-bud-spent').innerText = tSpent.toLocaleString() + ' ₽';
-            const totalPerc = tLimit > 0 ? Math.round((tSpent/tLimit)*100) : 0;
-            document.getElementById('total-bud-perc').innerText = totalPerc + '%';
-            document.getElementById('total-bud-chart').style.strokeDasharray = `${Math.min(totalPerc, 100)} 100`;
-        }
-
-        // AI
-        async function askAI() {
-            const input = document.getElementById('ai-input'), chat = document.getElementById('ai-chat'), q = input.value.trim();
-            if (!q) return;
-            chat.innerHTML += `<div class="user-msg">${q}</div>`;
-            input.value = ''; chat.scrollTop = chat.scrollHeight;
-            const tempId = 'ai-' + Date.now();
-            chat.innerHTML += `<div id="${tempId}" class="ai-msg">...</div>`;
-            setTimeout(() => {
-                const amount = q.match(/\d+/);
-                let res = "Не понял сумму. Попробуй: 'Такси 300'";
-                if (amount) res = `Записать ${amount[0]} ₽? <br><button style="background:var(--blue); color:white; border:none; padding:8px; border-radius:8px; margin-top:5px;" onclick="quickAdd('exp','📦',${amount[0]},'AI: ${q}')">✅ Да</button>`;
-                document.getElementById(tempId).innerHTML = res;
-                chat.scrollTop = chat.scrollHeight;
-            }, 600);
-        }
-
-        window.quickAdd = async (t, c, s, n) => {
-            db.unshift({ id: Date.now(), t, c, s, n, d: new Date().toISOString().split('T')[0] });
-            updateUI(); await cloudSave(); go('home');
-        };
-
-        // Вспомогательное
-        function setMode(m) { mode = m; currentCat = cats[m][0].i; renderCats(); document.getElementById('btn-exp').style.background = m === 'exp' ? 'var(--blue)' : 'transparent'; document.getElementById('btn-inc').style.background = m === 'inc' ? 'var(--blue)' : 'transparent'; }
-        function toggleBlur() { document.getElementById('bal').classList.toggle('blurred'); tg.HapticFeedback.impactOccurred('light'); }
-        function openEdit(id) { editingId = id; const item = db.find(x => x.id === id); document.getElementById('edit-sum').value = item.s; document.getElementById('edit-note').value = item.n; document.getElementById('edit-modal').style.display = 'flex'; }
-        function closeModal() { document.getElementById('edit-modal').style.display = 'none'; }
-        async function confirmEdit() { const item = db.find(x => x.id === editingId); item.s = parseFloat(document.getElementById('edit-sum').value); item.n = document.getElementById('edit-note').value; updateUI(); closeModal(); await cloudSave(); }
-        async function deleteTransaction() { db = db.filter(x => x.id !== editingId); updateUI(); closeModal(); await cloudSave(); }
 
         async function getRates() {
             try {
                 const btc = await (await fetch('https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd')).json();
                 document.getElementById('btc-rate').innerText = '$' + btc.bitcoin.usd.toLocaleString();
-                const rub = await (await fetch('https://api.exchangerate-api.com/v4/latest/USD')).json();
-                document.getElementById('usd-rate').innerText = rub.rates.RUB.toFixed(2) + '₽';
             } catch(e) {}
         }
 
-        window.onload = () => { 
-            document.getElementById('date-picker').value = new Date().toISOString().split('T')[0];
-            tg.expand(); syncFromCloud(); getRates(); 
-        };
+        window.onload = () => { tg.expand(); getRates(); updateUI(); };
     </script>
 </body>
 </html>
+
 
 
 
