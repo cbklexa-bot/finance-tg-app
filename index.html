@@ -23,7 +23,7 @@
         .page { display: none; padding: 15px; padding-bottom: 120px; box-sizing: border-box; }
         .active { display: block; }
 
-        /* Анимация контента (кроме фиксированной панели AI) */
+        /* Анимация только для контента страницы, исключая панель AI */
         .active > *:not(.ai-controls) { animation: slideUp 0.3s ease; }
 
         .compact-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; padding: 0 5px; }
@@ -44,8 +44,8 @@
         .modal-content { background: var(--card); border-radius: 28px; padding: 25px; border: 1px solid var(--border); width: 100%; max-width: 400px; }
 
         #chart-container { position: relative; height: 260px; margin: 10px 0; background: var(--card); border-radius: 28px; border: 1px solid var(--border); overflow: hidden; touch-action: pan-y; }
-        #chart-slider { display: flex; transition: transform 0.4s cubic-bezier(0.2, 0.8, 0.2, 1); height: 100%; }
-        .chart-slide { min-width: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; position: relative; }
+        #chart-slider { display: flex; transition: transform 0.4s cubic-bezier(0.2, 0.8, 0.2, 1); height: 100%; width: 100%; }
+        .chart-slide { min-width: 100%; width: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; position: relative; flex-shrink: 0; }
         .chart-title { position: absolute; top: 15px; font-size: 10px; font-weight: 800; color: var(--text); text-transform: uppercase; letter-spacing: 1px; }
         
         .dots { display: flex; justify-content: center; gap: 8px; margin-bottom: 20px; }
@@ -81,7 +81,6 @@
         #ai-chat::-webkit-scrollbar { width: 0; }
         .ai-msg { background: var(--card); padding: 12px; border-radius: 18px 18px 18px 5px; border: 1px solid var(--border); max-width: 85%; font-size: 14px; line-height: 1.4; }
         .user-msg { align-self: flex-end; background: var(--blue); color: white; padding: 12px; border-radius: 18px 18px 5px 18px; max-width: 85%; font-size: 14px; }
-        .ai-action-btn { background: var(--btn-bg); color: var(--blue); border: 1px solid var(--blue); padding: 8px 15px; border-radius: 12px; font-size: 12px; font-weight: 700; margin-top: 8px; cursor: pointer; }
         
         .ai-controls { 
             position: fixed; 
@@ -100,12 +99,9 @@
             transform: translateZ(0);
         }
         .icon-btn { background: none; border: none; padding: 5px; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: transform 0.1s; }
-        .icon-btn:active { transform: scale(0.9); }
         .icon-btn svg { width: 18px; height: 18px; stroke: var(--text); fill: none; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
         .send-btn svg { stroke: var(--blue); }
         .recording { animation: pulse 1.5s infinite; stroke: var(--red) !important; }
-
-        @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.3; } 100% { opacity: 1; } }
 
         .nav { position: fixed; bottom: 0; width: 100%; display: flex; padding-bottom: env(safe-area-inset-bottom, 15px); z-index: 1000; background: var(--glass); backdrop-filter: blur(20px); border-top: 0.5px solid var(--border); }
         .n-item { flex: 1; text-align: center; padding: 12px 0; color: var(--text); font-size: 10px; font-weight: 700; text-transform: uppercase; }
@@ -113,6 +109,7 @@
         .n-item svg { width: 22px; height: 22px; display: block; margin: 0 auto 4px; stroke: currentColor; fill: none; stroke-width: 2.5; }
 
         @keyframes slideUp { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.3; } 100% { opacity: 1; } }
     </style>
 </head>
 <body>
@@ -127,10 +124,10 @@
     </div></div>
 
     <div id="budget-modal"><div class="modal-content">
-        <h3 id="bud-modal-title" style="text-align:center;">Лимит</h3>
-        <input type="text" id="new-bud-name" class="note-in" placeholder="Название или Эмодзи">
+        <h3 style="text-align:center;">Лимит</h3>
+        <input type="text" id="new-bud-name" class="note-in" placeholder="Название">
         <input type="number" id="new-bud-val" class="note-in" style="margin-top:10px;" placeholder="Сумма">
-        <button id="bud-save-btn" class="save-btn" style="margin-top:20px;" onclick="addBudget()">Сохранить</button>
+        <button class="save-btn" style="margin-top:20px;" onclick="addBudget()">Сохранить</button>
         <button id="bud-del-btn" class="save-btn" style="background:var(--red); display:none; margin-top:10px;" onclick="deleteBudgetReal()">Удалить</button>
         <button class="note-in" style="margin-top:10px; background:none;" onclick="closeBudModal()">Отмена</button>
     </div></div>
@@ -164,11 +161,13 @@
     </div>
 
     <div id="p-an" class="page">
-        <div id="chart-container"><div id="chart-slider">
-            <div class="chart-slide"><span class="chart-title">Сегодня</span><svg width="200" height="200" viewBox="0 0 42 42" id="day-chart"></svg></div>
-            <div class="chart-slide"><span class="chart-title">Неделя</span><svg width="320" height="180" id="week-chart"></svg></div>
-            <div class="chart-slide"><span class="chart-title">Месяц</span><svg width="320" height="180" id="month-chart"></svg></div>
-        </div></div>
+        <div id="chart-container" ontouchstart="tS(event)" ontouchend="tE(event)">
+            <div id="chart-slider">
+                <div class="chart-slide"><span class="chart-title">Сегодня</span><svg width="200" height="200" viewBox="0 0 42 42" id="day-chart"></svg></div>
+                <div class="chart-slide"><span class="chart-title">Неделя</span><svg width="320" height="180" id="week-chart"></svg></div>
+                <div class="chart-slide"><span class="chart-title">Месяц</span><svg width="320" height="180" id="month-chart"></svg></div>
+            </div>
+        </div>
         <div class="dots"><div class="dot active"></div><div class="dot"></div><div class="dot"></div></div>
         <div id="h-list-full"></div>
     </div>
@@ -192,28 +191,22 @@
     </div>
 
     <div id="p-ai" class="page">
-        <div class="compact-header">
-            <span style="font-weight: 800; color: var(--text);">FINANCE AI Ассистент</span>
-        </div>
+        <div class="compact-header"><span style="font-weight: 800; color: var(--text);">FINANCE AI Ассистент</span></div>
         <div id="ai-chat" style="height: calc(100vh - 210px); overflow-y: auto; display: flex; flex-direction: column; gap: 10px; padding-bottom: 80px;">
-            <div class="ai-msg">Привет! Нажми на микрофон, чтобы продиктовать расход или просто напиши мне.</div>
+            <div class="ai-msg">Привет! Готов помочь с финансами.</div>
         </div>
         <div class="ai-controls">
-            <button class="icon-btn" id="voice-btn" onclick="toggleVoice()">
-                <svg id="mic-icon" viewBox="0 0 24 24"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>
-            </button>
+            <button class="icon-btn" onclick="toggleVoice()"><svg id="mic-icon" viewBox="0 0 24 24"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg></button>
             <input type="text" id="ai-input" style="flex:1; background:none; border:none; color:var(--main); outline:none; font-size:14px;" placeholder="Задай вопрос...">
-            <button class="icon-btn send-btn" onclick="askAI()">
-                <svg viewBox="0 0 24 24" style="transform: rotate(45deg);"><line x1="22" y1="2" x2="11" y2="13"/><polyline points="22 2 15 22 11 13 2 9 22 2"/></svg>
-            </button>
+            <button class="icon-btn send-btn" onclick="askAI()"><svg viewBox="0 0 24 24" style="transform: rotate(45deg);"><line x1="22" y1="2" x2="11" y2="13"/><polyline points="22 2 15 22 11 13 2 9 22 2"/></svg></button>
         </div>
     </div>
 
     <nav class="nav">
-        <div class="n-item active" id="n-home" onclick="go('home')"><svg viewBox="0 0 24 24"><path d="M3 9.5L12 3l9 6.5V20a1 1 0 01-1 1h-5v-7h-4v7H4a1 1 0 01-1-1V9.5z"/></svg>Главная</div>
-        <div class="n-item" id="n-an" onclick="go('an')"><svg viewBox="0 0 24 24"><path d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>История</div>
-        <div class="n-item" id="n-bud" onclick="go('bud')"><svg viewBox="0 0 24 24"><path d="M9 7h6m-6 4h6m-6 4h6M5 21h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v14a2 2 0 002 2z"/></svg>Бюджет</div>
-        <div class="n-item" id="n-ai" onclick="go('ai')"><svg viewBox="0 0 24 24"><path d="M12 2a10 10 0 00-7.74 16.33l-1.13 3.38a1 1 0 001.26 1.26l3.38-1.13A10 10 0 1012 2z"/></svg>AI</div>
+        <div class="n-item active" onclick="go('home')"><svg viewBox="0 0 24 24"><path d="M3 9.5L12 3l9 6.5V20a1 1 0 01-1 1h-5v-7h-4v7H4a1 1 0 01-1-1V9.5z"/></svg>Главная</div>
+        <div class="n-item" onclick="go('an')"><svg viewBox="0 0 24 24"><path d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>История</div>
+        <div class="n-item" onclick="go('bud')"><svg viewBox="0 0 24 24"><path d="M9 7h6m-6 4h6m-6 4h6M5 21h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v14a2 2 0 002 2z"/></svg>Бюджет</div>
+        <div class="n-item" onclick="go('ai')"><svg viewBox="0 0 24 24"><path d="M12 2a10 10 0 00-7.74 16.33l-1.13 3.38a1 1 0 001.26 1.26l3.38-1.13A10 10 0 1012 2z"/></svg>AI</div>
     </nav>
 
     <script>
@@ -232,30 +225,29 @@
             inc: [{n:'Зарплата', i:'💵'}, {n:'Инвест', i:'📈'}, {n:'Подарок', i:'🎁'}, {n:'Прочее', i:'📦'}]
         };
 
-        // Голосовое управление
-        let recognition;
-        if ('webkitSpeechRecognition' in window) {
-            recognition = new webkitSpeechRecognition();
-            recognition.lang = 'ru-RU';
-            recognition.onresult = (e) => { document.getElementById('ai-input').value = e.results[0][0].transcript; askAI(); toggleVoice(); };
-            recognition.onerror = () => toggleVoice();
-        }
-
-        function toggleVoice() {
-            const btn = document.getElementById('mic-icon');
-            if (btn.classList.contains('recording')) { btn.classList.remove('recording'); recognition.stop(); }
-            else { btn.classList.add('recording'); tg.HapticFeedback.impactOccurred('medium'); recognition.start(); }
-        }
-
+        // Навигация
         function go(p) {
             document.querySelectorAll('.page').forEach(e => e.classList.remove('active'));
             document.querySelectorAll('.n-item').forEach(e => e.classList.remove('active'));
-            document.getElementById('p-'+p).classList.add('active');
-            document.getElementById('n-'+p).classList.add('active');
+            const target = document.getElementById('p-'+p);
+            target.classList.add('active');
+            
+            const items = document.querySelectorAll('.n-item');
+            const idx = ['home', 'an', 'bud', 'ai'].indexOf(p);
+            items[idx].classList.add('active');
             updateUI();
         }
 
-        // Работа с данными
+        // Обработка свайпов графиков
+        function tS(e) { touchStartX = e.changedTouches[0].screenX; }
+        function tE(e) {
+            let x = e.changedTouches[0].screenX;
+            if (touchStartX - x > 50 && currentSlide < 2) currentSlide++;
+            if (x - touchStartX > 50 && currentSlide > 0) currentSlide--;
+            drawCharts();
+        }
+
+        // Данные
         async function syncFromCloud() {
             const local = localStorage.getItem('fin_cache_' + userId);
             if (local) { db = JSON.parse(local); updateUI(); }
@@ -291,7 +283,7 @@
             s.value = ''; n.value = ''; tg.HapticFeedback.notificationOccurred('success');
         }
 
-        // Графики и история
+        // Графики
         function drawCharts() {
             document.getElementById('chart-slider').style.transform = `translateX(-${currentSlide * 100}%)`;
             document.querySelectorAll('.dot').forEach((d, i) => d.classList.toggle('active', i === currentSlide));
@@ -305,7 +297,7 @@
             const today = new Date().toISOString().split('T')[0];
             const todayExp = db.filter(i => i.t === 'exp' && i.d === today);
             const total = todayExp.reduce((a, b) => a + b.s, 0);
-            if (total === 0) { chart.innerHTML = `<circle cx="21" cy="21" r="15.9" fill="transparent" stroke="var(--border)" stroke-width="3"/><text x="21" y="21" text-anchor="middle" dy=".3em" fill="var(--text)" font-size="3">0 ₽</text>`; return; }
+            if (total === 0) { chart.innerHTML = `<circle cx="21" cy="21" r="15.9" fill="transparent" stroke="var(--border)" stroke-width="3"/><text x="21" y="21" text-anchor="middle" dy=".3em" fill="var(--text)" font-size="4">0 ₽</text>`; return; }
             const catSums = {}; todayExp.forEach(i => catSums[i.c] = (catSums[i.c] || 0) + i.s);
             let offset = 0, html = '';
             Object.entries(catSums).forEach(([cat, sum]) => {
@@ -381,7 +373,7 @@
             document.getElementById('total-bud-chart').style.strokeDasharray = `${Math.min(totalPerc, 100)} 100`;
         }
 
-        // AI Ассистент
+        // AI
         async function askAI() {
             const input = document.getElementById('ai-input'), chat = document.getElementById('ai-chat'), q = input.value.trim();
             if (!q) return;
@@ -391,10 +383,8 @@
             chat.innerHTML += `<div id="${tempId}" class="ai-msg">...</div>`;
             setTimeout(() => {
                 const amount = q.match(/\d+/);
-                let res = "Попробуй: 'Обед 500'";
-                if (amount) {
-                    res = `Нашел запись: ${amount[0]} ₽. Добавить? <br><button class="ai-action-btn" onclick="quickAdd('exp','📦',${amount[0]},'AI: ${q}')">✅ Добавить</button>`;
-                }
+                let res = "Не понял сумму. Попробуй: 'Такси 300'";
+                if (amount) res = `Записать ${amount[0]} ₽? <br><button style="background:var(--blue); color:white; border:none; padding:8px; border-radius:8px; margin-top:5px;" onclick="quickAdd('exp','📦',${amount[0]},'AI: ${q}')">✅ Да</button>`;
                 document.getElementById(tempId).innerHTML = res;
                 chat.scrollTop = chat.scrollHeight;
             }, 600);
@@ -405,7 +395,7 @@
             updateUI(); await cloudSave(); go('home');
         };
 
-        // Вспомогательные функции
+        // Вспомогательное
         function setMode(m) { mode = m; currentCat = cats[m][0].i; renderCats(); document.getElementById('btn-exp').style.background = m === 'exp' ? 'var(--blue)' : 'transparent'; document.getElementById('btn-inc').style.background = m === 'inc' ? 'var(--blue)' : 'transparent'; }
         function toggleBlur() { document.getElementById('bal').classList.toggle('blurred'); tg.HapticFeedback.impactOccurred('light'); }
         function openEdit(id) { editingId = id; const item = db.find(x => x.id === id); document.getElementById('edit-sum').value = item.s; document.getElementById('edit-note').value = item.n; document.getElementById('edit-modal').style.display = 'flex'; }
@@ -429,6 +419,7 @@
     </script>
 </body>
 </html>
+
 
 
 
