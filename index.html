@@ -20,8 +20,11 @@
         }
 
         body { font-family: -apple-system, sans-serif; background: var(--bg); color: var(--main); margin: 0; min-height: 100vh; overflow-x: hidden; padding-top: env(safe-area-inset-top); }
-        .page { display: none; padding: 15px; padding-bottom: 120px; }
-        .active { display: block; animation: slideUp 0.4s ease; }
+        .page { display: none; padding: 15px; padding-bottom: 120px; box-sizing: border-box; }
+        .active { display: block; }
+
+        /* Анимация контента (кроме фиксированной панели AI) */
+        .active > *:not(.ai-controls) { animation: slideUp 0.3s ease; }
 
         .compact-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; padding: 0 5px; }
         .ticker-group { display: flex; gap: 15px; }
@@ -80,21 +83,36 @@
         .user-msg { align-self: flex-end; background: var(--blue); color: white; padding: 12px; border-radius: 18px 18px 5px 18px; max-width: 85%; font-size: 14px; }
         .ai-action-btn { background: var(--btn-bg); color: var(--blue); border: 1px solid var(--blue); padding: 8px 15px; border-radius: 12px; font-size: 12px; font-weight: 700; margin-top: 8px; cursor: pointer; }
         
-        .ai-controls { position: fixed; bottom: 85px; left: 15px; right: 15px; display: flex; align-items: center; gap: 8px; background: var(--card); padding: 8px 12px; border-radius: 24px; border: 1px solid var(--border); z-index: 100; }
-        .icon-btn { background: none; border: none; padding: 6px; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: transform 0.1s; }
+        .ai-controls { 
+            position: fixed; 
+            bottom: 75px; 
+            left: 15px; 
+            right: 15px; 
+            display: flex; 
+            align-items: center; 
+            gap: 5px; 
+            background: var(--card); 
+            padding: 4px 8px; 
+            border-radius: 20px; 
+            border: 1px solid var(--border); 
+            z-index: 100;
+            animation: none !important;
+            transform: translateZ(0);
+        }
+        .icon-btn { background: none; border: none; padding: 5px; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: transform 0.1s; }
         .icon-btn:active { transform: scale(0.9); }
-        .icon-btn svg { width: 22px; height: 22px; stroke: var(--text); fill: none; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
+        .icon-btn svg { width: 18px; height: 18px; stroke: var(--text); fill: none; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
         .send-btn svg { stroke: var(--blue); }
         .recording { animation: pulse 1.5s infinite; stroke: var(--red) !important; }
 
         @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.3; } 100% { opacity: 1; } }
 
-        .nav { position: fixed; bottom: 0; width: 100%; display: flex; padding-bottom: env(safe-area-inset-bottom, 15px); z-index: 1000; transition: 0.3s; background: var(--glass); backdrop-filter: blur(20px); border-top: 0.5px solid var(--border); }
+        .nav { position: fixed; bottom: 0; width: 100%; display: flex; padding-bottom: env(safe-area-inset-bottom, 15px); z-index: 1000; background: var(--glass); backdrop-filter: blur(20px); border-top: 0.5px solid var(--border); }
         .n-item { flex: 1; text-align: center; padding: 12px 0; color: var(--text); font-size: 10px; font-weight: 700; text-transform: uppercase; }
         .n-item.active { color: var(--blue); }
         .n-item svg { width: 22px; height: 22px; display: block; margin: 0 auto 4px; stroke: currentColor; fill: none; stroke-width: 2.5; }
 
-        @keyframes slideUp { from { opacity: 0; transform: translateY(15px); } to { opacity: 1; transform: translateY(0); } }
+        @keyframes slideUp { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
     </style>
 </head>
 <body>
@@ -125,7 +143,6 @@
             </div>
             <div class="sw-box" onclick="document.body.classList.toggle('light');"></div>
         </div>
-
         <div class="balance-card" onclick="toggleBlur()">
             <span class="bal-label">Баланс</span>
             <div class="bal-container">
@@ -133,12 +150,10 @@
                 <svg class="eye-icon" viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
             </div>
         </div>
-
         <div style="display:flex; gap:8px; background:var(--btn-bg); padding:4px; border-radius:12px; margin-bottom:15px;">
             <div id="btn-exp" style="flex:1; text-align:center; padding:10px; border-radius:10px; font-size:12px; font-weight:800; cursor:pointer; background:var(--blue);" onclick="setMode('exp')">Расход</div>
             <div id="btn-inc" style="flex:1; text-align:center; padding:10px; border-radius:10px; font-size:12px; font-weight:800; cursor:pointer;" onclick="setMode('inc')">Доход</div>
         </div>
-
         <div class="input-section">
             <input type="number" id="sum" class="sum-in" placeholder="0" inputmode="decimal">
             <input type="text" id="note" class="note-in" placeholder="Заметка...">
@@ -180,15 +195,14 @@
         <div class="compact-header">
             <span style="font-weight: 800; color: var(--text);">FINANCE AI Ассистент</span>
         </div>
-        <div id="ai-chat" style="height: calc(100vh - 280px); overflow-y: auto; display: flex; flex-direction: column; gap: 10px; padding-bottom: 20px;">
-            <div class="ai-msg">Привет! Нажми на микрофон, чтобы продиктовать расход (например: "Маршрутка 50 рублей"), или просто напиши мне.</div>
+        <div id="ai-chat" style="height: calc(100vh - 210px); overflow-y: auto; display: flex; flex-direction: column; gap: 10px; padding-bottom: 80px;">
+            <div class="ai-msg">Привет! Нажми на микрофон, чтобы продиктовать расход или просто напиши мне.</div>
         </div>
-        
         <div class="ai-controls">
             <button class="icon-btn" id="voice-btn" onclick="toggleVoice()">
                 <svg id="mic-icon" viewBox="0 0 24 24"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>
             </button>
-            <input type="text" id="ai-input" style="flex:1; background:none; border:none; color:var(--main); outline:none; font-size:15px;" placeholder="Задай вопрос...">
+            <input type="text" id="ai-input" style="flex:1; background:none; border:none; color:var(--main); outline:none; font-size:14px;" placeholder="Задай вопрос...">
             <button class="icon-btn send-btn" onclick="askAI()">
                 <svg viewBox="0 0 24 24" style="transform: rotate(45deg);"><line x1="22" y1="2" x2="11" y2="13"/><polyline points="22 2 15 22 11 13 2 9 22 2"/></svg>
             </button>
@@ -218,36 +232,21 @@
             inc: [{n:'Зарплата', i:'💵'}, {n:'Инвест', i:'📈'}, {n:'Подарок', i:'🎁'}, {n:'Прочее', i:'📦'}]
         };
 
-        // --- Voice Logic ---
+        // Голосовое управление
         let recognition;
-        if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
-            const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-            recognition = new SpeechRecognition();
+        if ('webkitSpeechRecognition' in window) {
+            recognition = new webkitSpeechRecognition();
             recognition.lang = 'ru-RU';
-            recognition.interimResults = false;
-
-            recognition.onresult = (event) => {
-                const text = event.results[0][0].transcript;
-                document.getElementById('ai-input').value = text;
-                askAI();
-                toggleVoice();
-            };
+            recognition.onresult = (e) => { document.getElementById('ai-input').value = e.results[0][0].transcript; askAI(); toggleVoice(); };
             recognition.onerror = () => toggleVoice();
         }
 
         function toggleVoice() {
             const btn = document.getElementById('mic-icon');
-            if (btn.classList.contains('recording')) {
-                btn.classList.remove('recording');
-                recognition.stop();
-            } else {
-                btn.classList.add('recording');
-                tg.HapticFeedback.impactOccurred('medium');
-                recognition.start();
-            }
+            if (btn.classList.contains('recording')) { btn.classList.remove('recording'); recognition.stop(); }
+            else { btn.classList.add('recording'); tg.HapticFeedback.impactOccurred('medium'); recognition.start(); }
         }
 
-        // --- Core Logic ---
         function go(p) {
             document.querySelectorAll('.page').forEach(e => e.classList.remove('active'));
             document.querySelectorAll('.n-item').forEach(e => e.classList.remove('active'));
@@ -256,15 +255,7 @@
             updateUI();
         }
 
-        const sliderContainer = document.getElementById('chart-container');
-        sliderContainer.addEventListener('touchstart', e => { touchStartX = e.changedTouches[0].screenX; });
-        sliderContainer.addEventListener('touchend', e => {
-            let diff = touchStartX - e.changedTouches[0].screenX;
-            if (diff > 50 && currentSlide < 2) currentSlide++;
-            else if (diff < -50 && currentSlide > 0) currentSlide--;
-            drawCharts();
-        });
-
+        // Работа с данными
         async function syncFromCloud() {
             const local = localStorage.getItem('fin_cache_' + userId);
             if (local) { db = JSON.parse(local); updateUI(); }
@@ -300,50 +291,15 @@
             s.value = ''; n.value = ''; tg.HapticFeedback.notificationOccurred('success');
         }
 
-        // --- AI Logic ---
-        async function askAI() {
-            const input = document.getElementById('ai-input'), chat = document.getElementById('ai-chat'), q = input.value.trim();
-            if (!q) return;
-            chat.innerHTML += `<div class="user-msg">${q}</div>`;
-            input.value = ''; chat.scrollTop = chat.scrollHeight;
-
-            const tempId = 'ai-' + Date.now();
-            chat.innerHTML += `<div id="${tempId}" class="ai-msg">...</div>`;
-            
-            setTimeout(() => {
-                const lower = q.toLowerCase();
-                let res = "Я не совсем понял. Попробуй: 'Продукты 500' или 'Сколько я потратил?'";
-                
-                // Parsing logic
-                const amount = q.match(/\d+/);
-                if (amount) {
-                    const sum = amount[0];
-                    let type = 'exp', cat = '📦', catName = 'Прочее';
-                    
-                    if (lower.includes('зарплат') || lower.includes('доход')) { type = 'inc'; cat = '💵'; catName = 'Зарплата'; }
-                    else if (lower.includes('еду') || lower.includes('продукт') || lower.includes('магаз')) { cat = '🛒'; catName = 'Продукты'; }
-                    else if (lower.includes('такси') || lower.includes('бензин') || lower.includes('авто')) { cat = '🚗'; catName = 'Авто'; }
-
-                    res = `Нашел запись: ${type === 'inc' ? 'Доход' : 'Расход'} ${sum} ₽ (${catName}). Добавить? 
-                           <br><button class="ai-action-btn" onclick="quickAdd('${type}','${cat}',${sum},'AI: ${q}')">✅ Добавить</button>`;
-                } else if (lower.includes('трат') || lower.includes('расход')) {
-                    const total = db.filter(i => i.t === 'exp').reduce((a,b) => a+b.s, 0);
-                    res = `Всего потрачено: ${total.toLocaleString()} ₽.`;
-                }
-
-                document.getElementById(tempId).innerHTML = res;
-                chat.scrollTop = chat.scrollHeight;
-            }, 600);
+        // Графики и история
+        function drawCharts() {
+            document.getElementById('chart-slider').style.transform = `translateX(-${currentSlide * 100}%)`;
+            document.querySelectorAll('.dot').forEach((d, i) => d.classList.toggle('active', i === currentSlide));
+            if(currentSlide === 0) renderDayChart();
+            if(currentSlide === 1) renderWeekChart();
+            if(currentSlide === 2) renderMonthChart();
         }
 
-        window.quickAdd = async (t, c, s, n) => {
-            db.unshift({ id: Date.now(), t, c, s, n, d: new Date().toISOString().split('T')[0] });
-            updateUI(); await cloudSave();
-            tg.HapticFeedback.notificationOccurred('success');
-            go('home');
-        };
-
-        // --- Charts & Helpers (Keeping existing logic) ---
         function renderDayChart() {
             const chart = document.getElementById('day-chart');
             const today = new Date().toISOString().split('T')[0];
@@ -361,14 +317,6 @@
             chart.innerHTML = html;
         }
 
-        function drawCharts() {
-            document.getElementById('chart-slider').style.transform = `translateX(-${currentSlide * 100}%)`;
-            document.querySelectorAll('.dot').forEach((d, i) => d.classList.toggle('active', i === currentSlide));
-            if(currentSlide === 0) renderDayChart();
-            if(currentSlide === 1) renderWeekChart();
-            if(currentSlide === 2) renderMonthChart();
-        }
-
         function renderWeekChart() {
             const svg = document.getElementById('week-chart');
             const days = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'];
@@ -376,13 +324,11 @@
             const now = new Date();
             const currentDayIdx = now.getDay() === 0 ? 6 : now.getDay() - 1;
             const monday = new Date(now); monday.setDate(now.getDate() - currentDayIdx);
-
             for(let i=0; i<7; i++) {
                 const d = new Date(monday); d.setDate(monday.getDate() + i);
                 const ds = d.toISOString().split('T')[0];
                 weekSums[i] = db.filter(item => item.t === 'exp' && item.d === ds).reduce((a, b) => a + b.s, 0);
             }
-
             const max = Math.max(...weekSums, 1000) * 1.3;
             svg.innerHTML = weekSums.map((v, i) => {
                 const h = (v/max)*120; const x = 30 + i*40; const y = 140-h;
@@ -394,15 +340,18 @@
 
         function renderMonthChart() {
             const svg = document.getElementById('month-chart');
-            const sums = new Array(6).fill(0);
-            for(let i=0; i<6; i++) {
-                sums[i] = db.filter(item => item.t === 'exp' && (new Date().getDate() - new Date(item.d).getDate() <= (i+1)*5)).reduce((a, b) => a + b.s, 0);
+            const pointsCount = 6;
+            const sums = new Array(pointsCount).fill(0);
+            const now = new Date();
+            for(let i=0; i<pointsCount; i++) {
+                const dayLimit = (i + 1) * 5;
+                sums[i] = db.filter(item => item.t === 'exp' && (now - new Date(item.d)) / 86400000 <= dayLimit).reduce((a, b) => a + b.s, 0);
             }
             const max = Math.max(...sums, 1000) * 1.4;
-            const points = sums.map((v, i) => ({x: 40 + i*50, y: 140 - (v/max)*100}));
+            const points = sums.map((v, i) => ({ x: 40 + i * 48, y: 140 - (v / max) * 100 }));
             const pathData = points.map(p => `${p.x},${p.y}`).join(' ');
             svg.innerHTML = `<polyline points="${pathData}" fill="none" stroke="var(--blue)" stroke-width="3" />` + 
-                points.map(p => `<circle cx="${p.x}" cy="${p.y}" r="3" fill="var(--blue)"/>`).join('');
+                points.map((p, i) => `<circle cx="${p.x}" cy="${p.y}" r="4" fill="var(--blue)"/><text x="${p.x}" y="165" text-anchor="middle" fill="var(--text)" font-size="8">${(i+1)*5}д</text>`).join('');
         }
 
         function renderHistory() {
@@ -410,11 +359,7 @@
             h.innerHTML = db.map(i => `<div class="h-item" onclick="openEdit(${i.id})"><div><span style="font-size:18px; margin-right:8px;">${i.c}</span><b>${i.n}</b><br><small style="color:var(--text)">${i.d}</small></div><div class="h-amount" style="color:${i.t==='exp'?'var(--red)':'var(--green)'}">${i.s.toLocaleString()} ₽</div></div>`).join('');
         }
 
-        function openEdit(id) { editingId = id; const item = db.find(x => x.id === id); document.getElementById('edit-sum').value = item.s; document.getElementById('edit-note').value = item.n; document.getElementById('edit-modal').style.display = 'flex'; }
-        function closeModal() { document.getElementById('edit-modal').style.display = 'none'; }
-        async function confirmEdit() { const item = db.find(x => x.id === editingId); item.s = parseFloat(document.getElementById('edit-sum').value); item.n = document.getElementById('edit-note').value; updateUI(); closeModal(); await cloudSave(); }
-        async function deleteTransaction() { db = db.filter(x => x.id !== editingId); updateUI(); closeModal(); await cloudSave(); }
-
+        // Бюджет
         function openBudModal(idx = null) { editingBudIdx = idx; if(idx !== null) { document.getElementById('new-bud-name').value = budgets[idx].name; document.getElementById('new-bud-val').value = budgets[idx].limit; document.getElementById('bud-del-btn').style.display = 'block'; } else { document.getElementById('new-bud-name').value = ''; document.getElementById('new-bud-val').value = ''; document.getElementById('bud-del-btn').style.display = 'none'; } document.getElementById('budget-modal').style.display = 'flex'; }
         function closeBudModal() { document.getElementById('budget-modal').style.display = 'none'; }
         function addBudget() { const n = document.getElementById('new-bud-name').value, v = parseFloat(document.getElementById('new-bud-val').value); if(editingBudIdx !== null) budgets[editingBudIdx] = {name:n, limit:v}; else budgets.push({name:n, limit:v}); closeBudModal(); updateUI(); cloudSave(); }
@@ -429,7 +374,6 @@
                 const perc = Math.min((spent/b.limit)*100, 100);
                 return `<div class="bud-progress-card" onclick="openBudModal(${i})"><div style="display:flex; justify-content:space-between; font-size:14px;"><b>${b.name}</b><span>${spent.toLocaleString()} / ${b.limit.toLocaleString()} ₽</span></div><div class="pg-bar"><div class="pg-fill" style="width:${perc}%; background:${perc > 90 ? 'var(--red)' : 'var(--blue)'}"></div></div></div>`;
             }).join('');
-            
             document.getElementById('total-bud-limit').innerText = tLimit.toLocaleString() + ' ₽';
             document.getElementById('total-bud-spent').innerText = tSpent.toLocaleString() + ' ₽';
             const totalPerc = tLimit > 0 ? Math.round((tSpent/tLimit)*100) : 0;
@@ -437,8 +381,37 @@
             document.getElementById('total-bud-chart').style.strokeDasharray = `${Math.min(totalPerc, 100)} 100`;
         }
 
+        // AI Ассистент
+        async function askAI() {
+            const input = document.getElementById('ai-input'), chat = document.getElementById('ai-chat'), q = input.value.trim();
+            if (!q) return;
+            chat.innerHTML += `<div class="user-msg">${q}</div>`;
+            input.value = ''; chat.scrollTop = chat.scrollHeight;
+            const tempId = 'ai-' + Date.now();
+            chat.innerHTML += `<div id="${tempId}" class="ai-msg">...</div>`;
+            setTimeout(() => {
+                const amount = q.match(/\d+/);
+                let res = "Попробуй: 'Обед 500'";
+                if (amount) {
+                    res = `Нашел запись: ${amount[0]} ₽. Добавить? <br><button class="ai-action-btn" onclick="quickAdd('exp','📦',${amount[0]},'AI: ${q}')">✅ Добавить</button>`;
+                }
+                document.getElementById(tempId).innerHTML = res;
+                chat.scrollTop = chat.scrollHeight;
+            }, 600);
+        }
+
+        window.quickAdd = async (t, c, s, n) => {
+            db.unshift({ id: Date.now(), t, c, s, n, d: new Date().toISOString().split('T')[0] });
+            updateUI(); await cloudSave(); go('home');
+        };
+
+        // Вспомогательные функции
         function setMode(m) { mode = m; currentCat = cats[m][0].i; renderCats(); document.getElementById('btn-exp').style.background = m === 'exp' ? 'var(--blue)' : 'transparent'; document.getElementById('btn-inc').style.background = m === 'inc' ? 'var(--blue)' : 'transparent'; }
         function toggleBlur() { document.getElementById('bal').classList.toggle('blurred'); tg.HapticFeedback.impactOccurred('light'); }
+        function openEdit(id) { editingId = id; const item = db.find(x => x.id === id); document.getElementById('edit-sum').value = item.s; document.getElementById('edit-note').value = item.n; document.getElementById('edit-modal').style.display = 'flex'; }
+        function closeModal() { document.getElementById('edit-modal').style.display = 'none'; }
+        async function confirmEdit() { const item = db.find(x => x.id === editingId); item.s = parseFloat(document.getElementById('edit-sum').value); item.n = document.getElementById('edit-note').value; updateUI(); closeModal(); await cloudSave(); }
+        async function deleteTransaction() { db = db.filter(x => x.id !== editingId); updateUI(); closeModal(); await cloudSave(); }
 
         async function getRates() {
             try {
@@ -450,10 +423,7 @@
         }
 
         window.onload = () => { 
-            const d = new Date();
-            const offset = d.getTimezoneOffset() * 60000;
-            const localISOTime = (new Date(d - offset)).toISOString().split('T')[0];
-            document.getElementById('date-picker').value = localISOTime;
+            document.getElementById('date-picker').value = new Date().toISOString().split('T')[0];
             tg.expand(); syncFromCloud(); getRates(); 
         };
     </script>
