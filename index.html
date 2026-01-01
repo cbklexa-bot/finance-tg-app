@@ -438,93 +438,71 @@ async function askAI() {
     const q = input.value.trim();
     if (!q) return;
 
-    // 1. Отображаем сообщение пользователя в чате
     chat.innerHTML += `<div class="user-msg">${q}</div>`;
     input.value = '';
 
     const tempId = 'ai-' + Date.now();
-    chat.innerHTML += `<div id="${tempId}" class="ai-msg">🧠 Анализирую...</div>`;
+    chat.innerHTML += `<div id="${tempId}" class="ai-msg">📡 Анализирую...</div>`;
     chat.scrollTop = chat.scrollHeight;
 
     try {
-        // Отправляем запрос на твой Cloudflare Function
         const response = await fetch('/chat', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ 
-                prompt: q, 
-                history: db.slice(0, 30) // Передаем последние 30 транзакций для анализа
-            })
+            body: JSON.stringify({ prompt: q, history: db.slice(0, 20) })
         });
-
-        if (!response.ok) throw new Error('Ошибка сети');
 
         const raw = await response.json();
         const content = raw?.choices?.[0]?.message?.content || "";
-
-        // 2. Ищем JSON в тексте (защита от лишних слов ИИ)
         const jsonMatch = content.match(/\{[\s\S]*\}/);
         
         if (jsonMatch) {
-            try {
-                const ai = JSON.parse(jsonMatch[0]);
+            const ai = JSON.parse(jsonMatch[0]);
 
-                /* === РЕЖИМ 1: АВТОЗАПИСЬ ТРАТЫ === */
-                if (ai.action === 'add') {
-                    // Твои точные категории и их иконки
-                    const categoryMap = {
-                        "продукты": "🛒",
-                        "авто": "🚗",
-                        "жильё": "🏠",
-                        "шопинг": "🛍️",
-                        "аптека": "💊",
-                        "подарки": "🎁",
-                        "отдых": "🎭",
-                        "прочее": "📦"
-                    };
+            if (ai.action === 'add') {
+                // ТВОЯ КАРТА ИКОНОК
+                const myCategories = {
+                    "продукты": "🛒",
+                    "авто": "🚗",
+                    "жильё": "🏠",
+                    "шопинг": "🛍️",
+                    "аптека": "💊",
+                    "подарки": "🎁",
+                    "отдых": "🎭",
+                    "прочее": "📦"
+                };
 
-                    // Приводим категорию от ИИ к нижнему регистру для поиска
-                    const catName = (ai.category || "прочее").toLowerCase();
-                    const icon = categoryMap[catName] || "📦";
+                // Чистим название категории от ИИ
+                const rawCat = (ai.category || "прочее").toLowerCase().trim();
+                const finalIcon = myCategories[rawCat] || "📦";
 
-                    const newEntry = {
-                        id: Date.now(),
-                        t: ai.type || 'exp',
-                        c: icon,
-                        s: parseFloat(ai.amount) || 0,
-                        n: ai.note || '',
-                        d: new Date().toISOString().split('T')[0]
-                    };
+                const newEntry = {
+                    id: Date.now(),
+                    t: ai.type || 'exp',
+                    c: finalIcon, // Подставляем твою иконку
+                    s: parseFloat(ai.amount) || 0,
+                    n: ai.note || '',
+                    d: new Date().toISOString().split('T')[0]
+                };
 
-                    // Сохранение
-                    db.unshift(newEntry);
-                    if (typeof updateUI === 'function') updateUI();
-                    if (typeof cloudSave === 'function') await cloudSave();
-                    
-                    document.getElementById(tempId).innerHTML = `
-                        <div style="color: var(--green); font-weight: bold;">✅ Записано!</div>
-                        <div>${icon} ${ai.category}: ${newEntry.s} ₽</div>
-                        <div style="font-size: 0.8em; opacity: 0.7;">${newEntry.n}</div>
-                    `;
-                } 
-                /* === РЕЖИМ 2: ОТВЕТ АНАЛИТИКА (ЧАТ) === */
-                else if (ai.action === 'chat' || ai.text) {
-                    document.getElementById(tempId).innerText = ai.text || "Анализ завершен.";
-                }
-            } catch (parseErr) {
-                // Если внутри скобок был не валидный JSON
-                document.getElementById(tempId).innerText = content;
+                // === АВТОЗАПИСЬ ===
+                db.unshift(newEntry);
+                if (typeof updateUI === 'function') updateUI();
+                if (typeof cloudSave === 'function') await cloudSave();
+                
+                document.getElementById(tempId).innerHTML = `
+                    <div style="color:var(--green)">✅ Записано в <b>${rawCat}</b></div>
+                    <div>${finalIcon} ${newEntry.s} ₽ (${newEntry.n})</div>
+                `;
+            } else {
+                document.getElementById(tempId).innerText = ai.text || content;
             }
         } else {
-            // Если ИИ ответил просто текстом (без JSON)
             document.getElementById(tempId).innerText = content;
         }
-
     } catch (e) {
-        console.error("AI Error:", e);
-        document.getElementById(tempId).innerText = "❌ Ошибка: не удалось связаться с ИИ.";
+        document.getElementById(tempId).innerText = "❌ Ошибка связи с ИИ";
     }
-
     chat.scrollTop = chat.scrollHeight;
 }
         window.quickAdd = async (t, c, s, n) => {
@@ -555,6 +533,7 @@ async function askAI() {
     </script>
 </body>
 </html>
+
 
 
 
