@@ -80,7 +80,15 @@
         .ai-msg { background: var(--card); padding: 12px; border-radius: 18px 18px 18px 5px; border: 1px solid var(--border); max-width: 85%; font-size: 14px; line-height: 1.4; }
         .user-msg { align-self: flex-end; background: var(--blue); color: white; padding: 12px; border-radius: 18px 18px 5px 18px; max-width: 85%; font-size: 14px; }
         
-        /* СТИЛИ ДЛЯ ГОЛОСОВОГО ВВОДА */
+        /* КАТЕГОРИИ В ЛИМИТАХ */
+        .bud-cat-select { display: flex; gap: 10px; overflow-x: auto; padding: 10px 0; margin-bottom: 10px; scrollbar-width: none; }
+        .bud-cat-item { 
+            flex: 0 0 40px; height: 40px; border-radius: 50%; background: var(--btn-bg); 
+            display: flex; align-items: center; justify-content: center; 
+            border: 2px solid transparent; cursor: pointer; font-size: 18px;
+        }
+        .bud-cat-item.active { border-color: var(--blue); background: var(--blue); }
+
         .ai-controls { 
             position: fixed; bottom: 75px; left: 15px; right: 15px; 
             display: flex; align-items: center; gap: 10px; 
@@ -118,9 +126,10 @@
     </div></div>
 
     <div id="budget-modal"><div class="modal-content">
-        <h3 style="text-align:center;">Лимит</h3>
-        <input type="text" id="new-bud-name" class="note-in" placeholder="Название">
-        <input type="number" id="new-bud-val" class="note-in" style="margin-top:10px;" placeholder="Сумма">
+        <h3 style="text-align:center;">Лимит по категории</h3>
+        <div class="bud-cat-select" id="bud-cat-list"></div>
+        <input type="text" id="new-bud-name" class="note-in" placeholder="Название (например, Еда)">
+        <input type="number" id="new-bud-val" class="note-in" style="margin-top:10px;" placeholder="Сумма лимита">
         <button class="save-btn" style="margin-top:20px;" onclick="addBudget()">Сохранить</button>
         <button id="bud-del-btn" class="save-btn" style="background:var(--red); display:none; margin-top:10px;" onclick="deleteBudgetReal()">Удалить</button>
         <button class="note-in" style="margin-top:10px; background:none;" onclick="closeBudModal()">Отмена</button>
@@ -216,73 +225,38 @@
         let db = [];
         let budgets = JSON.parse(localStorage.getItem('fin_budgets_' + userId)) || [];
         let mode = 'exp', currentCat = '🛒', currentSlide = 0, touchStartX = 0, editingBudIdx = null, editingId = null;
+        let budSelectedCat = '🛒';
         let isListening = false;
 
-        // ИНИЦИАЛИЗАЦИЯ ГОЛОСА (МГНОВЕННАЯ ОТПРАВКА)
-        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-        let recognition = null;
-        if (SpeechRecognition) {
-            recognition = new SpeechRecognition();
-            recognition.lang = 'ru-RU';
-            recognition.interimResults = false; 
-            
-            recognition.onstart = () => {
-                isListening = true;
-                document.getElementById('mic-btn').classList.add('active');
-                tg.HapticFeedback.impactOccurred('medium');
-            };
-            
-            recognition.onend = () => {
-                isListening = false;
-                document.getElementById('mic-btn').classList.remove('active');
-            };
-            
-            recognition.onresult = (event) => {
-                const text = event.results[0][0].transcript;
-                if (text.trim().length > 0) {
-                    document.getElementById('ai-input').value = text;
-                    tg.HapticFeedback.notificationOccurred('success');
-                    
-                    // МГНОВЕННАЯ ОТПРАВКА
-                    askAI();
-                }
-            };
-
-            recognition.onerror = (e) => {
-                isListening = false;
-                document.getElementById('mic-btn').classList.remove('active');
-                console.error("Speech Error:", e.error);
-            };
-        }
-
-        function toggleVoice() {
-            if (!recognition) return alert("Голосовой ввод не поддерживается");
-            if (isListening) recognition.stop(); else recognition.start();
-        }
-
-        // ОСТАЛЬНЫЕ ФУНКЦИИ
         const catColors = { '🛒':'#ff453a', '🚗':'#ff9f0a', '🏠':'#30d158', '🛍️':'#0a84ff', '💊':'#bf5af2', '🎁':'#ff375f', '🎭':'#64d2ff', '📦':'#a1a1aa', '💵':'#30d158', '📈':'#0a84ff' };
         const cats = {
             exp: [{n:'Продукты', i:'🛒'}, {n:'Авто', i:'🚗'}, {n:'Жилье', i:'🏠'}, {n:'Шопинг', i:'🛍️'}, {n:'Аптека', i:'💊'}, {n:'Подарки', i:'🎁'}, {n:'Отдых', i:'🎭'}, {n:'Прочее', i:'📦'}],
             inc: [{n:'Зарплата', i:'💵'}, {n:'Инвест', i:'📈'}, {n:'Подарок', i:'🎁'}, {n:'Прочее', i:'📦'}]
         };
 
+        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+        let recognition = null;
+        if (SpeechRecognition) {
+            recognition = new SpeechRecognition();
+            recognition.lang = 'ru-RU';
+            recognition.interimResults = false; 
+            recognition.onstart = () => { isListening = true; document.getElementById('mic-btn').classList.add('active'); tg.HapticFeedback.impactOccurred('medium'); };
+            recognition.onend = () => { isListening = false; document.getElementById('mic-btn').classList.remove('active'); };
+            recognition.onresult = (event) => {
+                const text = event.results[0][0].transcript;
+                if (text.trim().length > 0) { document.getElementById('ai-input').value = text; askAI(); }
+            };
+        }
+
+        function toggleVoice() { if (!recognition) return alert("Голосовой ввод не поддерживается"); if (isListening) recognition.stop(); else recognition.start(); }
+
         function go(p) {
             document.querySelectorAll('.page').forEach(e => e.classList.remove('active'));
             document.querySelectorAll('.n-item').forEach(e => e.classList.remove('active'));
-            const target = document.getElementById('p-'+p);
-            target.classList.add('active');
+            document.getElementById('p-'+p).classList.add('active');
             const idx = ['home', 'an', 'bud', 'ai'].indexOf(p);
             document.querySelectorAll('.n-item')[idx].classList.add('active');
             updateUI();
-        }
-
-        function tS(e) { touchStartX = e.changedTouches[0].screenX; }
-        function tE(e) {
-            let x = e.changedTouches[0].screenX;
-            if (touchStartX - x > 50 && currentSlide < 2) currentSlide++;
-            if (x - touchStartX > 50 && currentSlide > 0) currentSlide--;
-            drawCharts();
         }
 
         async function syncFromCloud() {
@@ -290,7 +264,7 @@
             if (local) { db = JSON.parse(local); updateUI(); }
             try {
                 const { data } = await _supabase.from('finance').select('data').eq('id', userId).maybeSingle();
-                if (data?.data) { db = data.data; localStorage.setItem('fin_cache_' + userId, JSON.stringify(db)); updateUI(); }
+                if (data?.data) { db = data.data; updateUI(); }
             } catch(e) {}
         }
 
@@ -308,26 +282,78 @@
         }
 
         function renderCats() {
-            const container = document.getElementById('cat-list');
-            container.innerHTML = cats[mode].map(c => `<div class="cat-item ${currentCat === c.i ? 'active' : ''}" onclick="currentCat='${c.i}'; renderCats();"><div class="cat-icon">${c.i}</div><span class="cat-name">${c.n}</span></div>`).join('');
+            document.getElementById('cat-list').innerHTML = cats[mode].map(c => `<div class="cat-item ${currentCat === c.i ? 'active' : ''}" onclick="currentCat='${c.i}'; renderCats();"><div class="cat-icon">${c.i}</div><span class="cat-name">${c.n}</span></div>`).join('');
+        }
+
+        function renderBudCatList() {
+            document.getElementById('bud-cat-list').innerHTML = cats.exp.map(c => `
+                <div class="bud-cat-item ${budSelectedCat === c.i ? 'active' : ''}" onclick="budSelectedCat='${c.i}'; renderBudCatList();">
+                    ${c.i}
+                </div>`).join('');
         }
 
         async function save() {
             const s = document.getElementById('sum'), n = document.getElementById('note'), d = document.getElementById('date-picker');
             if(!s.value) return;
             db.unshift({ id: Date.now(), t: mode, c: currentCat, s: parseFloat(s.value), n: n.value || 'Запись', d: d.value });
-            updateUI(); await cloudSave();
-            s.value = ''; n.value = ''; tg.HapticFeedback.notificationOccurred('success');
+            updateUI(); await cloudSave(); s.value = ''; n.value = ''; tg.HapticFeedback.notificationOccurred('success');
         }
 
-        function drawCharts() {
-            document.getElementById('chart-slider').style.transform = `translateX(-${currentSlide * 100}%)`;
-            document.querySelectorAll('.dot').forEach((d, i) => d.classList.toggle('active', i === currentSlide));
-            if(currentSlide === 0) renderDayChart();
-            if(currentSlide === 1) renderWeekChart();
-            if(currentSlide === 2) renderMonthChart();
+        function renderBudget() {
+            const list = document.getElementById('budget-list');
+            const curMonth = new Date().toISOString().slice(0, 7);
+            let tLimit = 0, tSpent = 0;
+
+            list.innerHTML = budgets.map((b, i) => {
+                // СВЯЗЬ: Считаем расходы только по иконке этого лимита за текущий месяц
+                const spent = db.filter(t => t.t === 'exp' && t.c === b.cat && t.d.startsWith(curMonth)).reduce((a,c)=>a+c.s, 0);
+                tLimit += b.limit; tSpent += spent; 
+                const perc = Math.min((spent/b.limit)*100, 100);
+                return `<div class="bud-progress-card" onclick="openBudModal(${i})">
+                            <div style="display:flex; justify-content:space-between; font-size:14px;">
+                                <b>${b.cat} ${b.name}</b>
+                                <span>${spent.toLocaleString()} / ${b.limit.toLocaleString()} ₽</span>
+                            </div>
+                            <div class="pg-bar"><div class="pg-fill" style="width:${perc}%; background:${perc > 90 ? 'var(--red)' : 'var(--blue)'}"></div></div>
+                        </div>`;
+            }).join('');
+
+            document.getElementById('total-bud-limit').innerText = tLimit.toLocaleString() + ' ₽';
+            document.getElementById('total-bud-spent').innerText = tSpent.toLocaleString() + ' ₽';
+            const totalPerc = tLimit > 0 ? Math.round((tSpent/tLimit)*100) : 0;
+            document.getElementById('total-bud-perc').innerText = totalPerc + '%';
+            document.getElementById('total-bud-chart').style.strokeDasharray = `${Math.min(totalPerc, 100)} 100`;
         }
 
+        function openBudModal(idx = null) { 
+            editingBudIdx = idx; 
+            if(idx !== null) { 
+                document.getElementById('new-bud-name').value = budgets[idx].name; 
+                document.getElementById('new-bud-val').value = budgets[idx].limit; 
+                budSelectedCat = budgets[idx].cat || '🛒';
+                document.getElementById('bud-del-btn').style.display = 'block'; 
+            } else { 
+                document.getElementById('new-bud-name').value = ''; 
+                document.getElementById('new-bud-val').value = ''; 
+                document.getElementById('bud-del-btn').style.display = 'none'; 
+            } 
+            renderBudCatList();
+            document.getElementById('budget-modal').style.display = 'flex'; 
+        }
+
+        function closeBudModal() { document.getElementById('budget-modal').style.display = 'none'; }
+        
+        function addBudget() { 
+            const n = document.getElementById('new-bud-name').value, v = parseFloat(document.getElementById('new-bud-val').value); 
+            if(!n || isNaN(v)) return;
+            const data = {name: n, limit: v, cat: budSelectedCat};
+            if(editingBudIdx !== null) budgets[editingBudIdx] = data; else budgets.push(data); 
+            closeBudModal(); updateUI(); cloudSave(); 
+        }
+
+        function deleteBudgetReal() { budgets.splice(editingBudIdx, 1); closeBudModal(); updateUI(); cloudSave(); }
+
+        // Отрисовка графиков
         function renderDayChart() {
             const chart = document.getElementById('day-chart');
             const today = new Date().toISOString().split('T')[0];
@@ -386,30 +412,24 @@
             `;
         }
 
-        function renderHistory() {
-            const h = document.getElementById('h-list-full');
-            h.innerHTML = db.map(i => `<div class="h-item" onclick="openEdit(${i.id})"><div><span style="font-size:18px; margin-right:8px;">${i.c}</span><b>${i.n}</b><br><small style="color:var(--text)">${i.d}</small></div><div class="h-amount" style="color:${i.t==='exp'?'var(--red)':'var(--green)'}">${i.s.toLocaleString()} ₽</div></div>`).join('');
+        function drawCharts() {
+            document.getElementById('chart-slider').style.transform = `translateX(-${currentSlide * 100}%)`;
+            document.querySelectorAll('.dot').forEach((d, i) => d.classList.toggle('active', i === currentSlide));
+            if(currentSlide === 0) renderDayChart();
+            if(currentSlide === 1) renderWeekChart();
+            if(currentSlide === 2) renderMonthChart();
         }
 
-        function openBudModal(idx = null) { editingBudIdx = idx; if(idx !== null) { document.getElementById('new-bud-name').value = budgets[idx].name; document.getElementById('new-bud-val').value = budgets[idx].limit; document.getElementById('bud-del-btn').style.display = 'block'; } else { document.getElementById('new-bud-name').value = ''; document.getElementById('new-bud-val').value = ''; document.getElementById('bud-del-btn').style.display = 'none'; } document.getElementById('budget-modal').style.display = 'flex'; }
-        function closeBudModal() { document.getElementById('budget-modal').style.display = 'none'; }
-        function addBudget() { const n = document.getElementById('new-bud-name').value, v = parseFloat(document.getElementById('new-bud-val').value); if(editingBudIdx !== null) budgets[editingBudIdx] = {name:n, limit:v}; else budgets.push({name:n, limit:v}); closeBudModal(); updateUI(); cloudSave(); }
-        function deleteBudgetReal() { budgets.splice(editingBudIdx, 1); closeBudModal(); updateUI(); cloudSave(); }
-        
-        function renderBudget() {
-            const list = document.getElementById('budget-list');
-            let tLimit = 0, tSpent = 0;
-            list.innerHTML = budgets.map((b, i) => {
-                const spent = db.filter(t => t.t === 'exp' && (t.n.includes(b.name) || t.c === b.name)).reduce((a,c)=>a+c.s, 0);
-                tLimit += b.limit; tSpent += spent; 
-                const perc = Math.min((spent/b.limit)*100, 100);
-                return `<div class="bud-progress-card" onclick="openBudModal(${i})"><div style="display:flex; justify-content:space-between; font-size:14px;"><b>${b.name}</b><span>${spent.toLocaleString()} / ${b.limit.toLocaleString()} ₽</span></div><div class="pg-bar"><div class="pg-fill" style="width:${perc}%; background:${perc > 90 ? 'var(--red)' : 'var(--blue)'}"></div></div></div>`;
-            }).join('');
-            document.getElementById('total-bud-limit').innerText = tLimit.toLocaleString() + ' ₽';
-            document.getElementById('total-bud-spent').innerText = tSpent.toLocaleString() + ' ₽';
-            const totalPerc = tLimit > 0 ? Math.round((tSpent/tLimit)*100) : 0;
-            document.getElementById('total-bud-perc').innerText = totalPerc + '%';
-            document.getElementById('total-bud-chart').style.strokeDasharray = `${Math.min(totalPerc, 100)} 100`;
+        function tS(e) { touchStartX = e.changedTouches[0].screenX; }
+        function tE(e) {
+            let x = e.changedTouches[0].screenX;
+            if (touchStartX - x > 50 && currentSlide < 2) currentSlide++;
+            if (x - touchStartX > 50 && currentSlide > 0) currentSlide--;
+            drawCharts();
+        }
+
+        function renderHistory() {
+            document.getElementById('h-list-full').innerHTML = db.map(i => `<div class="h-item" onclick="openEdit(${i.id})"><div><span style="font-size:18px; margin-right:8px;">${i.c}</span><b>${i.n}</b><br><small style="color:var(--text)">${i.d}</small></div><div class="h-amount" style="color:${i.t==='exp'?'var(--red)':'var(--green)'}">${i.s.toLocaleString()} ₽</div></div>`).join('');
         }
 
         async function askAI() {
@@ -421,7 +441,7 @@
             chat.innerHTML += `<div id="${tempId}" class="ai-msg">...</div>`;
             setTimeout(() => {
                 const amount = q.match(/\d+/);
-                let res = "Не понял сумму. Попробуй сказать: 'Такси 300'";
+                let res = "Не понял сумму. Попробуй: 'Такси 300'";
                 if (amount) res = `Записать ${amount[0]} ₽? <br><button style="background:var(--blue); color:white; border:none; padding:8px; border-radius:8px; margin-top:5px;" onclick="quickAdd('exp','📦',${amount[0]},'AI: ${q}')">✅ Да</button>`;
                 document.getElementById(tempId).innerHTML = res;
                 chat.scrollTop = chat.scrollHeight;
