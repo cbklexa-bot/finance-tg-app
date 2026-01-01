@@ -432,21 +432,62 @@
             document.getElementById('h-list-full').innerHTML = db.map(i => `<div class="h-item" onclick="openEdit(${i.id})"><div><span style="font-size:18px; margin-right:8px;">${i.c}</span><b>${i.n}</b><br><small style="color:var(--text)">${i.d}</small></div><div class="h-amount" style="color:${i.t==='exp'?'var(--red)':'var(--green)'}">${i.s.toLocaleString()} ₽</div></div>`).join('');
         }
 
-        async function askAI() {
-            const input = document.getElementById('ai-input'), chat = document.getElementById('ai-chat'), q = input.value.trim();
-            if (!q) return;
-            chat.innerHTML += `<div class="user-msg">${q}</div>`;
-            input.value = ''; chat.scrollTop = chat.scrollHeight;
-            const tempId = 'ai-' + Date.now();
-            chat.innerHTML += `<div id="${tempId}" class="ai-msg">...</div>`;
-            setTimeout(() => {
-                const amount = q.match(/\d+/);
-                let res = "Не понял сумму. Попробуй: 'Такси 300'";
-                if (amount) res = `Записать ${amount[0]} ₽? <br><button style="background:var(--blue); color:white; border:none; padding:8px; border-radius:8px; margin-top:5px;" onclick="quickAdd('exp','📦',${amount[0]},'AI: ${q}')">✅ Да</button>`;
-                document.getElementById(tempId).innerHTML = res;
-                chat.scrollTop = chat.scrollHeight;
-            }, 600);
+  async function askAI() {
+    const input = document.getElementById('ai-input');
+    const chat = document.getElementById('ai-chat');
+    const q = input.value.trim();
+    if (!q) return;
+
+    // Отображаем сообщение пользователя
+    chat.innerHTML += `<div class="user-msg">${q}</div>`;
+    input.value = '';
+    
+    // Создаем временный блок для ответа ИИ
+    const tempId = 'ai-' + Date.now();
+    chat.innerHTML += `<div id="${tempId}" class="ai-msg">Думаю...</div>`;
+    chat.scrollTop = chat.scrollHeight;
+
+    try {
+        // Вызываем твою функцию в Cloudflare
+        const response = await fetch('/chat', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ prompt: q })
+        });
+
+        if (!response.ok) throw new Error('Ошибка сервера. Проверь функции в Cloudflare.');
+
+        const data = await response.json();
+        
+        // Получаем текст ответа
+        let content = data.choices[0].message.content;
+        
+        // Очищаем от лишних символов ```json ... ``` если ИИ их добавил
+        content = content.replace(/```json/g, '').replace(/```/g, '').trim();
+        
+        // Пытаемся распарсить JSON от ИИ
+        const aiMsg = JSON.parse(content);
+
+        if (aiMsg.action === 'add') {
+            // Если ИИ распознал транзакцию
+            document.getElementById(tempId).innerHTML = `
+                ${aiMsg.type === 'inc' ? '💰 Доход' : '📉 Расход'}: <b>${aiMsg.amount} ₽</b><br>
+                ${aiMsg.category} ${aiMsg.note}<br>
+                <button onclick="quickAdd('${aiMsg.type || 'exp'}','${aiMsg.category}',${aiMsg.amount},'${aiMsg.note}'); this.innerText='✅ Записано'" 
+                        style="background:var(--blue); color:white; border:none; padding:8px 12px; border-radius:10px; margin-top:10px; cursor:pointer;">
+                    Подтвердить
+                </button>
+            `;
+        } else {
+            // Если ИИ просто отвечает на вопрос
+            document.getElementById(tempId).innerText = aiMsg.text || aiMsg.answer || "Не удалось обработать запрос";
         }
+    } catch (e) {
+        console.error(e);
+        document.getElementById(tempId).innerText = "Ошибка связи с ИИ. Попробуй позже.";
+    }
+    chat.scrollTop = chat.scrollHeight;
+}
 
         window.quickAdd = async (t, c, s, n) => {
             db.unshift({ id: Date.now(), t, c, s, n, d: new Date().toISOString().split('T')[0] });
@@ -476,6 +517,8 @@
     </script>
 </body>
 </html>
+
+
 
 
 
