@@ -1,36 +1,57 @@
 export async function onRequestPost(context) {
   const { request, env } = context;
-  const body = await request.json();
 
-  // Это инструкция для ИИ
-  const systemPrompt = `Ты — финансовый помощник. Ты анализируешь текст и возвращаешь ТОЛЬКО JSON.
-  Формат ответа:
-  1. Если это трата/доход: {"action": "add", "type": "exp", "amount": 500, "category": "🍔", "note": "Обед"}
-  2. Если это вопрос/чат: {"action": "chat", "text": "Твой ответ пользователю"}
-  
-  Доступные иконки категорий: 🛒, 🚗, 🍔, 💊, 🏠, 🎁, 🎮, 👕, 🍕, 💰.
-  Если категория неясна, используй 📦.`;
+  // 1. Проверяем наличие ключа в переменных окружения Cloudflare
+  if (!env.OPENROUTER_API_KEY) {
+    return new Response(
+      JSON.stringify({ error: "Критическая ошибка: API ключ не настроен в Cloudflare." }), 
+      { status: 500, headers: { 'Content-Type': 'application/json' } }
+    );
+  }
 
-  const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
-    method: "POST",
-    headers: {
-      "Authorization": `Bearer ${env.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}`,
-      "Content-Type": "application/json"
-    },
-    body: JSON.stringify({
-      model: "deepseek/deepseek-chat", // Можно поменять на google/gemini-flash-1.5 для скорости
-      messages: [
-        { role: "system", content: systemPrompt },
-        { role: "user", content: body.prompt }
-      ],
-      response_format: { type: "json_object" } 
-    })
-  });
+  try {
+    const body = await request.json();
 
-  const data = await response.json();
-  return new Response(JSON.stringify(data), {
-    headers: { 'Content-Type': 'application/json' }
-  });
+    // 2. Формируем запрос к OpenRouter
+    const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${env.OPENROUTER_API_KEY}`, // Используем переменную, а не текст!
+        "Content-Type": "application/json",
+        "HTTP-Referer": "https://pages.cloudflare.com", // Обязательно для OpenRouter
+        "X-Title": "Finance TG App"
+      },
+      body: JSON.stringify({
+        model: "deepseek/deepseek-chat",
+        messages: [
+          { 
+            role: "system", 
+            content: `Ты — финансовый ассистент. Анализируй текст и возвращай ТОЛЬКО строго валидный JSON.
+            Формат ответа:
+            1. Если это трата или доход: {"action": "add", "type": "exp", "amount": 500, "category": "🍔", "note": "Обед"}
+            2. Если это вопрос или общение: {"action": "chat", "text": "Твой ответ"}
+            Категории: 🛒, 🚗, 🍔, 💊, 🏠, 🎁, 🎮, 💰.` 
+          },
+          { role: "user", content: body.prompt }
+        ],
+        // Включаем JSON mode, чтобы модель не писала лишнего текста
+        response_format: { type: "json_object" }
+      })
+    });
+
+    const data = await response.json();
+
+    // 3. Возвращаем ответ фронтенду
+    return new Response(JSON.stringify(data), {
+      headers: { 'Content-Type': 'application/json' }
+    });
+
+  } catch (e) {
+    return new Response(
+      JSON.stringify({ error: "Ошибка сервера: " + e.message }), 
+      { status: 500, headers: { 'Content-Type': 'application/json' } }
+    );
+  }
 }
 
 
