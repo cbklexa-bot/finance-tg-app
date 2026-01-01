@@ -1,38 +1,35 @@
 export async function onRequestPost({ request, env }) {
   try {
     const { prompt, history } = await request.json();
-    const today = new Date().toISOString().split('T')[0];
+    const today = new Date().toLocaleDateString('ru-RU');
 
-    // Формируем краткую историю для экономии токенов
-    const historyText = history && history.length > 0 
-      ? JSON.stringify(history.slice(0, 50)) // Последние 50 транзакций
-      : "История пуста";
+    // Берем последние 40 транзакций для контекста
+    const context = history && history.length > 0 
+      ? JSON.stringify(history.slice(0, 40)) 
+      : "Транзакций пока нет";
 
     const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
       method: "POST",
       headers: {
         "Authorization": `Bearer ${env.OPENROUTER_API_KEY}`,
-        "Content-Type": "application/json"
+        "Content-Type": "application/json",
+        "HTTP-Referer": "https://finance-tg-app.pages.dev"
       },
       body: JSON.stringify({
         model: "google/gemini-2.0-flash-001",
         messages: [
           {
             role: "system",
-            content: `Ты — продвинутый финансовый аналитик. 
-            Сегодняшняя дата: ${today}.
-            История транзакций пользователя: ${historyText}.
+            content: `Ты — элитный финансовый аналитик. 
+            Сегодня: ${today}. 
+            Данные пользователя: ${context}.
 
-            ТВОИ ПРАВИЛА:
-            1. Если пользователь вводит расход/доход (пр: "купил кофе 200"), верни ТОЛЬКО JSON: 
-               {"action":"add", "type":"exp", "category":"☕", "amount":200, "note":"Кофе"}
-            
-            2. Если пользователь просит анализ (пр: "сколько я потратил?", "сделай отчет"), проанализируй историю и верни JSON: 
-               {"action":"chat", "text":"Твой детальный разбор с цифрами и советами"}
+            ТВОИ ЗАДАЧИ:
+            1. ЕСЛИ ЭТО ТРАТА/ДОХОД: Верни ТОЛЬКО JSON: {"action":"add","type":"exp или inc","category":"emoji","amount":число,"note":"..."}
+            2. ЕСЛИ ЭТО ВОПРОС ПО ИСТОРИИ (Анализ): Сделай глубокий расчет. Считай суммы, сравнивай категории. Ответ давай в JSON: {"action":"chat","text":"Твой детальный ответ"}
+            3. ЕСЛИ ЭТО ОБЩЕНИЕ: Отвечай дружелюбно в JSON: {"action":"chat","text":"..."}
 
-            3. Если это просто общение, верни JSON: {"action":"chat", "text":"Приветственный текст"}
-            
-            ПИШИ ТОЛЬКО ЧИСТЫЙ JSON БЕЗ РАЗМЕТКИ.`
+            ВАЖНО: Всегда отвечай СТРОГО в формате JSON. Не пиши лишних слов до или после JSON.`
           },
           { role: "user", content: prompt }
         ]
@@ -45,6 +42,7 @@ export async function onRequestPost({ request, env }) {
     return new Response(JSON.stringify({ error: e.message }), { status: 500 });
   }
 }
+
 
 
 
