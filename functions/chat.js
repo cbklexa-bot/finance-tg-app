@@ -3,33 +3,34 @@ export async function onRequestPost({ request, env }) {
     const { prompt, history } = await request.json();
     const today = new Date().toLocaleDateString('ru-RU');
 
-    // Берем последние 40 транзакций для контекста
-    const context = history && history.length > 0 
-      ? JSON.stringify(history.slice(0, 40)) 
-      : "Транзакций пока нет";
-
     const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
       method: "POST",
       headers: {
         "Authorization": `Bearer ${env.OPENROUTER_API_KEY}`,
-        "Content-Type": "application/json",
-        "HTTP-Referer": "https://finance-tg-app.pages.dev"
+        "Content-Type": "application/json"
       },
       body: JSON.stringify({
         model: "google/gemini-2.0-flash-001",
         messages: [
           {
             role: "system",
-            content: `Ты — элитный финансовый аналитик. 
-            Сегодня: ${today}. 
-            Данные пользователя: ${context}.
+            content: `Ты — продвинутый финансовый аналитик. Твоя задача — классифицировать траты по СТРОГИМ категориям пользователя.
 
-            ТВОИ ЗАДАЧИ:
-            1. ЕСЛИ ЭТО ТРАТА/ДОХОД: Верни ТОЛЬКО JSON: {"action":"add","type":"exp или inc","category":"emoji","amount":число,"note":"..."}
-            2. ЕСЛИ ЭТО ВОПРОС ПО ИСТОРИИ (Анализ): Сделай глубокий расчет. Считай суммы, сравнивай категории. Ответ давай в JSON: {"action":"chat","text":"Твой детальный ответ"}
-            3. ЕСЛИ ЭТО ОБЩЕНИЕ: Отвечай дружелюбно в JSON: {"action":"chat","text":"..."}
+            СПИСОК ТВОИХ КАТЕГОРИЙ:
+            1. продукты (еда, хлеб, напитки, супермаркеты)
+            2. авто (заправка, бензин, запчасти, ремонт колеса, мойка, сервис)
+            3. жильё (интернет, электричество, свет, вода, аренда, ЖКХ, газ)
+            4. шопинг (одежда, техника, электроника)
+            5. аптека (лекарства, аптеки, врачи)
+            6. подарки (цветы, донаты, подарки друзьям)
+            7. отдых (кино, кафе, рестораны, бары, хобби)
+            8. прочее (все остальное)
 
-            ВАЖНО: Всегда отвечай СТРОГО в формате JSON. Не пиши лишних слов до или после JSON.`
+            ИНСТРУКЦИЯ:
+            - Если пользователь пишет про машину (колесо, бензин, запчасти) -> категория "авто".
+            - Если пишет про дом (свет, ток, интернет, коммуналка) -> категория "жильё".
+            - Верни ТОЛЬКО JSON: {"action":"add", "type":"exp", "category":"название_категории_из_списка", "amount":число, "note":"подробное описание"}
+            - Если это вопрос или анализ -> {"action":"chat", "text":"твой ответ"}.`
           },
           { role: "user", content: prompt }
         ]
@@ -42,6 +43,7 @@ export async function onRequestPost({ request, env }) {
     return new Response(JSON.stringify({ error: e.message }), { status: 500 });
   }
 }
+
 
 
 
