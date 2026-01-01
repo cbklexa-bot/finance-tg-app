@@ -433,71 +433,63 @@
         }
 
   async function askAI() {
-  const input = document.getElementById('ai-input');
-  const chat = document.getElementById('ai-chat');
-  const q = input.value.trim();
-  if (!q) return;
+    const input = document.getElementById('ai-input');
+    const chat = document.getElementById('ai-chat');
+    const q = input.value.trim();
+    if (!q) return;
 
-  chat.innerHTML += `<div class="user-msg">${q}</div>`;
-  input.value = '';
+    // Отображаем сообщение пользователя
+    chat.innerHTML += `<div class="user-msg">${q}</div>`;
+    input.value = '';
+    
+    const tempId = 'ai-' + Date.now();
+    chat.innerHTML += `<div id="${tempId}" class="ai-msg">🧠 Думаю...</div>`;
+    chat.scrollTop = chat.scrollHeight;
 
-  const id = 'ai-' + Date.now();
-  chat.innerHTML += `<div id="${id}" class="ai-msg">Думаю...</div>`;
-  chat.scrollTop = chat.scrollHeight;
+    try {
+        const response = await fetch('/chat', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ 
+                prompt: q, 
+                history: db // Передаем историю для анализа
+            })
+        });
 
-  try {
-    const response = await fetch('/chat', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        prompt: q,
-        context: {
-          transactions: db,
-          budgets: budgets,
-          balance: db.reduce((a,i)=>a+(i.t==='inc'?i.s:-i.s),0)
+        const raw = await response.json();
+        const text = raw?.choices?.[0]?.message?.content;
+        const cleanedText = text.replace(/```json/g, '').replace(/```/g, '').trim();
+
+        const ai = JSON.parse(cleanedText);
+
+        /* === АВТОЗАПИСЬ БЕЗ ПОДТВЕРЖДЕНИЯ === */
+        if (ai.action === 'add') {
+            const newEntry = {
+                id: Date.now(),
+                t: ai.type === 'inc' ? 'inc' : 'exp',
+                c: ai.category || '❓',
+                s: parseFloat(ai.amount),
+                n: ai.note || '',
+                d: new Date().toISOString().split('T')[0]
+            };
+            
+            db.unshift(newEntry); // Добавляем в начало списка
+            updateUI();           // Обновляем интерфейс (баланс, список)
+            await cloudSave();    // Сохраняем в Supabase
+            
+            document.getElementById(tempId).innerHTML = `✅ Записано: <b>${ai.amount} ₽</b> (${ai.category} ${ai.note})`;
+        } 
+        /* === АНАЛИЗ И ЧАТ === */
+        else if (ai.action === 'chat') {
+            document.getElementById(tempId).innerText = ai.text;
         }
-      })
-    });
 
-    const raw = await response.json();
-    const text = raw?.choices?.[0]?.message?.content;
-    if (!text) throw 'empty';
-
-    const ai = JSON.parse(text);
-
-    /* === АВТОЗАПИСЬ БЕЗ ПОДТВЕРЖДЕНИЯ === */
-    if (ai.action === 'add') {
-      db.unshift({
-        id: Date.now(),
-        t: ai.type,
-        c: ai.category,
-        s: ai.amount,
-        n: ai.note,
-        d: new Date().toISOString().split('T')[0]
-      });
-      updateUI();
-      cloudSave();
-
-      document.getElementById(id).innerText =
-        `✅ Записал: ${ai.category} ${ai.note} — ${ai.amount} ₽`;
+    } catch (e) {
+        console.error(e);
+        document.getElementById(tempId).innerText = "Не удалось обработать запрос. Попробуй еще раз.";
     }
-
-    /* === ГЛУБОКИЙ АНАЛИЗ === */
-    else if (ai.action === 'analysis') {
-      document.getElementById(id).innerText = ai.text;
-    }
-
-    else {
-      document.getElementById(id).innerText = 'Ответ AI не распознан';
-    }
-
-  } catch (e) {
-    console.error(e);
-    document.getElementById(id).innerText =
-      'Ошибка связи с AI';
-  }
+    chat.scrollTop = chat.scrollHeight;
 }
-
         window.quickAdd = async (t, c, s, n) => {
             db.unshift({ id: Date.now(), t, c, s, n, d: new Date().toISOString().split('T')[0] });
             updateUI(); await cloudSave(); go('home');
@@ -526,6 +518,7 @@
     </script>
 </body>
 </html>
+
 
 
 
