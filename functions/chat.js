@@ -1,11 +1,12 @@
 export async function onRequestPost({ request, env }) {
   try {
     const { prompt, history } = await request.json();
+    const today = new Date().toISOString().split('T')[0];
 
-    // Превращаем историю в читаемый для ИИ текст
-    const historyContext = history && history.length > 0 
-      ? `История последних транзакций: ${JSON.stringify(history)}`
-      : "История транзакций пока пуста.";
+    // Формируем краткую историю для экономии токенов
+    const historyText = history && history.length > 0 
+      ? JSON.stringify(history.slice(0, 50)) // Последние 50 транзакций
+      : "История пуста";
 
     const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
       method: "POST",
@@ -14,25 +15,24 @@ export async function onRequestPost({ request, env }) {
         "Content-Type": "application/json"
       },
       body: JSON.stringify({
-        model: "google/gemini-2.0-flash-001", // Самая умная и быстрая модель для анализа
+        model: "google/gemini-2.0-flash-001",
         messages: [
           {
             role: "system",
-            content: `Ты — экспертный финансовый аналитик премиум-класса. 
-            Твоя задача: помогать пользователю управлять личными финансами.
+            content: `Ты — продвинутый финансовый аналитик. 
+            Сегодняшняя дата: ${today}.
+            История транзакций пользователя: ${historyText}.
 
-            ДАННЫЕ ПОЛЬЗОВАТЕЛЯ:
-            ${historyContext}
+            ТВОИ ПРАВИЛА:
+            1. Если пользователь вводит расход/доход (пр: "купил кофе 200"), верни ТОЛЬКО JSON: 
+               {"action":"add", "type":"exp", "category":"☕", "amount":200, "note":"Кофе"}
+            
+            2. Если пользователь просит анализ (пр: "сколько я потратил?", "сделай отчет"), проанализируй историю и верни JSON: 
+               {"action":"chat", "text":"Твой детальный разбор с цифрами и советами"}
 
-            ТВОИ ВОЗМОЖНОСТИ:
-            1. ЗАПИСЬ: Если видишь трату/доход, верни JSON: {"action":"add","type":"exp/inc","category":"emoji","amount":0,"note":"..."}
-            2. АНАЛИЗ: Если пользователь просит анализ ("Сколько я потратил?", "На чем сэкономить?", "Сделай отчет"), проведи глубокий расчет по предоставленной истории.
-            3. СОВЕТЫ: Давай рекомендации по финансовой грамотности на основе реальных трат.
-
-            ФОРМАТ ОТВЕТА:
-            - Если это запись транзакции: ТОЛЬКО JSON {"action":"add",...}
-            - Если это анализ/вопрос: верни JSON {"action":"chat","text":"Твой детальный анализ с цифрами и советами"}.
-            - В текстовых ответах используй абзацы и эмодзи для читабельности.`
+            3. Если это просто общение, верни JSON: {"action":"chat", "text":"Приветственный текст"}
+            
+            ПИШИ ТОЛЬКО ЧИСТЫЙ JSON БЕЗ РАЗМЕТКИ.`
           },
           { role: "user", content: prompt }
         ]
@@ -45,6 +45,7 @@ export async function onRequestPost({ request, env }) {
     return new Response(JSON.stringify({ error: e.message }), { status: 500 });
   }
 }
+
 
 
 
