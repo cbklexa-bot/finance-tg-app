@@ -469,10 +469,7 @@ const response = await fetch('/chat', {
   body: JSON.stringify({
     prompt: q,
     history: historyText
-  })
 });
-
-        });
 
         const raw = await response.json();
         const content = raw?.choices?.[0]?.message?.content || "";
@@ -560,6 +557,7 @@ const response = await fetch('/chat', {
     </script>
 </body>
 </html>
+
 
 
 
