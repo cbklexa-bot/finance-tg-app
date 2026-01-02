@@ -402,79 +402,87 @@
             }).join('');
         }
 
-        function renderMonthChart() {
-            const svg = document.getElementById('month-chart');
-            const pointsCount = 6; // 6 точек
-            const daysPerBlock = 5; // Каждая точка = 5 дней
-            const sums = new Array(pointsCount).fill(0);
+       function renderMonthChart() {
+    const svg = document.getElementById('month-chart');
+    const pointsCount = 6; // Количество точек на графике
+    const daysPerBlock = 5; // Шаг (5 дней)
+    const sums = new Array(pointsCount).fill(0);
+    const labels = new Array(pointsCount).fill('');
+    
+    // Текущая дата (конец графика)
+    const now = new Date();
+    now.setHours(23, 59, 59, 999);
+
+    // 1. Проходим слева направо (i=0 — это самая старая точка, i=5 — сегодня)
+    for(let i = 0; i < pointsCount; i++) {
+        // Рассчитываем, насколько далеко в прошлом эта точка
+        // Если i=0 (лево), offset=5 (25 дней назад)
+        // Если i=5 (право), offset=0 (0 дней назад)
+        const offset = pointsCount - 1 - i; 
+
+        const minDaysAgo = offset * daysPerBlock;       
+        const maxDaysAgo = (offset + 1) * daysPerBlock; 
+
+        // Генерируем красивую дату для подписи (например "25.05")
+        const labelDate = new Date();
+        labelDate.setDate(now.getDate() - minDaysAgo);
+        const day = String(labelDate.getDate()).padStart(2, '0');
+        const month = String(labelDate.getMonth() + 1).padStart(2, '0');
+        labels[i] = `${day}.${month}`;
+
+        // Фильтруем и суммируем траты для этого периода
+        sums[i] = db.filter(item => {
+            if (item.t !== 'exp') return false;
             
-            // Получаем "конец" сегодняшнего дня для корректного сравнения
-            const now = new Date();
-            now.setHours(23, 59, 59, 999);
+            const itemDate = new Date(item.d);
+            const diffTime = now - itemDate;
+            const diffDays = diffTime / (1000 * 60 * 60 * 24);
 
-            // 1. Считаем суммы для каждой точки (слева направо: от старого к новому)
-            for(let i=0; i<pointsCount; i++) {
-                // i=0 (левая точка) — это период 25-30 дней назад
-                // i=5 (правая точка) — это период 0-5 дней назад (свежий)
-                const offset = pointsCount - 1 - i; 
+            // Берем траты, которые попадают в этот блок времени
+            return diffDays >= minDaysAgo && diffDays < maxDaysAgo;
+        }).reduce((a, b) => a + b.s, 0);
+    }
 
-                const minDaysAgo = offset * daysPerBlock;       // например, 0 дней назад
-                const maxDaysAgo = (offset + 1) * daysPerBlock; // например, 5 дней назад
+    // 2. Масштаб графика
+    const max = Math.max(...sums, 1000) * 1.3;
 
-                sums[i] = db.filter(item => {
-                    if (item.t !== 'exp') return false;
-                    
-                    const itemDate = new Date(item.d);
-                    const diffTime = now - itemDate;
-                    const diffDays = diffTime / (1000 * 60 * 60 * 24);
+    // 3. Координаты точек
+    const points = sums.map((v, i) => ({ 
+        x: 40 + i * 48, 
+        y: 140 - (v / max) * 100 
+    }));
 
-                    // Если трата попала в этот 5-дневный промежуток
-                    return diffDays >= minDaysAgo && diffDays < maxDaysAgo;
-                }).reduce((a, b) => a + b.s, 0);
-            }
+    // 4. Рисуем линии
+    const linePath = points.map((p, i) => (i === 0 ? 'M' : 'L') + `${p.x},${p.y}`).join(' ');
+    const areaPath = linePath + ` L${points[points.length-1].x},140 L${points[0].x},140 Z`;
 
-            // 2. Определяем масштаб графика
-            // Если сумм нет, берем 1000 как базу, чтобы график не ломался. 1.3 — для отступа сверху.
-            const max = Math.max(...sums, 1000) * 1.3;
-
-            // 3. Вычисляем координаты точек
-            // x: смещение по горизонтали, y: высота (SVG 0 — это верх, поэтому 140 минус значение)
-            const points = sums.map((v, i) => ({ 
-                x: 40 + i * 48, 
-                y: 140 - (v / max) * 100 
-            }));
-
-            // 4. Строим линии и область заливки
-            const linePath = points.map((p, i) => (i === 0 ? 'M' : 'L') + `${p.x},${p.y}`).join(' ');
-            const areaPath = linePath + ` L${points[points.length-1].x},140 L${points[0].x},140 Z`;
-
-            // 5. Рендерим SVG
-            svg.innerHTML = `
-                <defs>
-                    <linearGradient id="gm" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="0%" stop-color="var(--blue)" stop-opacity="0.3"/>
-                        <stop offset="100%" stop-color="transparent"/>
-                    </linearGradient>
-                </defs>
-                
-                <path d="${areaPath}" fill="url(#gm)" />
-                
-                <path d="${linePath}" fill="none" stroke="var(--blue)" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
-                
-                ${points.map((p, i) => {
-                    // Подпись снизу: сколько дней назад (30д ... 5д)
-                    const dayLabel = (pointsCount - i) * 5;
-                    // Сумма над точкой (если больше 0)
-                    const valLabel = sums[i] > 0 ? Math.round(sums[i]) : '';
-                    
-                    return `
-                    <circle cx="${p.x}" cy="${p.y}" r="4" fill="var(--bg)" stroke="var(--blue)" stroke-width="2"/>
-                    <text x="${p.x}" y="${p.y-12}" text-anchor="middle" fill="var(--main)" font-size="8" font-weight="900">${valLabel}</text>
-                    <text x="${p.x}" y="165" text-anchor="middle" fill="var(--text)" font-size="8">${dayLabel}д</text>
-                    `;
-                }).join('')}
+    // 5. Выводим SVG
+    svg.innerHTML = `
+        <defs>
+            <linearGradient id="gm" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stop-color="var(--blue)" stop-opacity="0.3"/>
+                <stop offset="100%" stop-color="transparent"/>
+            </linearGradient>
+        </defs>
+        
+        <path d="${areaPath}" fill="url(#gm)" />
+        
+        <path d="${linePath}" fill="none" stroke="var(--blue)" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+        
+        ${points.map((p, i) => {
+            // Сумма над точкой (если есть траты)
+            const valLabel = sums[i] > 0 ? Math.round(sums[i]) : '';
+            
+            return `
+            <circle cx="${p.x}" cy="${p.y}" r="4" fill="var(--card)" stroke="var(--blue)" stroke-width="2"/>
+            
+            <text x="${p.x}" y="${p.y-12}" text-anchor="middle" fill="var(--main)" font-size="8" font-weight="900">${valLabel}</text>
+            
+            <text x="${p.x}" y="165" text-anchor="middle" fill="var(--text)" font-size="8">${labels[i]}</text>
             `;
-        }
+        }).join('')}
+    `;
+}
 
         function drawCharts() {
             document.getElementById('chart-slider').style.transform = `translateX(-${currentSlide * 100}%)`;
@@ -619,6 +627,7 @@ async function askAI() {
     </script>
 </body>
 </html>
+
 
 
 
