@@ -452,27 +452,25 @@ async function askAI() {
     input.value = '';
 
     const tempId = 'ai-' + Date.now();
-    chat.innerHTML += `<div id="${tempId}" class="ai-msg">📊 Анализирую твои финансы...</div>`;
+    chat.innerHTML += `<div id="${tempId}" class="ai-msg">📊 Анализирую...</div>`;
     chat.scrollTop = chat.scrollHeight;
 
     try {
+        const historyText = db.slice(0, 30).map(e =>
+            `${e.d} | ${e.t === 'inc' ? 'Доход' : 'Расход'} | ${e.c} | ${e.s} ₽ | ${e.n}`
+        ).join('\n');
+
         const response = await fetch('/chat', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-        const historyText = db.slice(0, 30).map(e => {
-  return `${e.d} | ${e.t === 'inc' ? 'Доход' : 'Расход'} | ${e.c} | ${e.s} ₽ | ${e.n}`;
-}).join('\n');
-
-const response = await fetch('/chat', {
-  method: 'POST',
-  headers: { 'Content-Type': 'application/json' },
-  body: JSON.stringify({
-    prompt: q,
-    history: historyText
-});
+            body: JSON.stringify({
+                prompt: q,
+                history: historyText
+            })
+        });
 
         const raw = await response.json();
-        const content = raw?.choices?.[0]?.message?.content || "";
+        const content = raw?.choices?.[0]?.message?.content || '';
         const jsonMatch = content.match(/\{[\s\S]*\}/);
 
         if (!jsonMatch) {
@@ -497,7 +495,7 @@ const response = await fetch('/chat', {
 
             const entry = {
                 id: Date.now(),
-                t: ai.type,
+                t: ai.type || 'exp',
                 c: catMap[ai.category] || "📦",
                 s: Number(ai.amount),
                 n: ai.note || '',
@@ -514,8 +512,8 @@ const response = await fetch('/chat', {
             `;
         }
 
-        // === АНАЛИЗ ===
-        else if (ai.action === 'analysis') {
+        // === ЧАТ / АНАЛИЗ ===
+        if (ai.action === 'chat') {
             document.getElementById(tempId).innerText = ai.text;
         }
 
@@ -525,10 +523,7 @@ const response = await fetch('/chat', {
     }
 
     chat.scrollTop = chat.scrollHeight;
-}
-
- 
-        
+}       
         window.quickAdd = async (t, c, s, n) => {
             db.unshift({ id: Date.now(), t, c, s, n, d: new Date().toISOString().split('T')[0] });
             updateUI(); await cloudSave(); go('home');
@@ -557,6 +552,7 @@ const response = await fetch('/chat', {
     </script>
 </body>
 </html>
+
 
 
 
