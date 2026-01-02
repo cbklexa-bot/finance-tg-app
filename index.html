@@ -459,10 +459,19 @@ async function askAI() {
         const response = await fetch('/chat', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                prompt: q,
-                history: db   // 🔥 ПЕРЕДАЁМ ВСЮ ИСТОРИЮ
-            })
+        const historyText = db.slice(0, 30).map(e => {
+  return `${e.d} | ${e.t === 'inc' ? 'Доход' : 'Расход'} | ${e.c} | ${e.s} ₽ | ${e.n}`;
+}).join('\n');
+
+const response = await fetch('/chat', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({
+    prompt: q,
+    history: historyText
+  })
+});
+
         });
 
         const raw = await response.json();
@@ -551,6 +560,7 @@ async function askAI() {
     </script>
 </body>
 </html>
+
 
 
 
