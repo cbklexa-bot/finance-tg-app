@@ -510,11 +510,12 @@ async function askAI() {
     const q = input.value.trim();
     if (!q) return;
 
+    // сообщение пользователя
     chat.innerHTML += `<div class="user-msg">${q}</div>`;
     input.value = '';
 
     const tempId = 'ai-' + Date.now();
-    chat.innerHTML += `<div id="${tempId}" class="ai-msg">📊 Анализирую твои финансы...</div>`;
+    chat.innerHTML += `<div id="${tempId}" class="ai-msg">📡 Анализирую...</div>`;
     chat.scrollTop = chat.scrollHeight;
 
     try {
@@ -523,40 +524,50 @@ async function askAI() {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 prompt: q,
-                history: db   // 🔥 ПЕРЕДАЁМ ВСЮ ИСТОРИЮ
+                context: {
+                    transactions: db,
+                    budgets: budgets,
+                    balance: db.reduce((a, i) => a + (i.t === 'inc' ? i.s : -i.s), 0),
+                    currency: "RUB"
+                }
             })
         });
 
-        const raw = await response.json();
-        const content = raw?.choices?.[0]?.message?.content || "";
-        const jsonMatch = content.match(/\{[\s\S]*\}/);
+        if (!response.ok) throw new Error('AI error');
 
-        if (!jsonMatch) {
-            document.getElementById(tempId).innerText = content || 'Нет ответа';
+        const raw = await response.json();
+        const content = raw?.choices?.[0]?.message?.content || '';
+        const match = content.match(/\{[\s\S]*\}/);
+
+        if (!match) {
+            document.getElementById(tempId).innerText = content || 'Нет ответа от AI';
             return;
         }
 
-        const ai = JSON.parse(jsonMatch[0]);
+        const ai = JSON.parse(match[0]);
 
-        // === АВТОЗАПИСЬ ===
+        // === КАРТА КАТЕГОРИЙ ===
+        const catMap = {
+            продукты: '🛒',
+            авто: '🚗',
+            жильё: '🏠',
+            шопинг: '🛍️',
+            аптека: '💊',
+            подарки: '🎁',
+            отдых: '🎭',
+            прочее: '📦'
+        };
+
+        // === АВТОЗАПИСЬ ДОХОДА / РАСХОДА ===
         if (ai.action === 'add') {
-            const catMap = {
-                продукты: "🛒",
-                авто: "🚗",
-                жильё: "🏠",
-                шопинг: "🛍️",
-                аптека: "💊",
-                подарки: "🎁",
-                отдых: "🎭",
-                прочее: "📦"
-            };
+            const icon = catMap[(ai.category || 'прочее').toLowerCase()] || '📦';
 
             const entry = {
                 id: Date.now(),
-                t: ai.type,
-                c: catMap[ai.category] || "📦",
-                s: Number(ai.amount),
-                n: ai.note || '',
+                t: ai.type === 'inc' ? 'inc' : 'exp',
+                c: icon,
+                s: Math.abs(Number(ai.amount)) || 0,
+                n: ai.note || 'Запись от AI',
                 d: new Date().toISOString().split('T')[0]
             };
 
@@ -565,23 +576,28 @@ async function askAI() {
             await cloudSave();
 
             document.getElementById(tempId).innerHTML = `
-                ✅ <b>Записано</b><br>
-                ${entry.c} ${entry.s} ₽ — ${entry.n}
+                <div style="color:var(--green); font-weight:700;">✅ Записано автоматически</div>
+                <div>${icon} <b>${entry.s} ₽</b> — ${entry.n}</div>
             `;
         }
 
-        // === АНАЛИЗ ===
+        // === АНАЛИЗ / СОВЕТ ===
         else if (ai.action === 'analysis') {
             document.getElementById(tempId).innerText = ai.text;
         }
 
+        // === НЕОПОЗНАННЫЙ ОТВЕТ ===
+        else {
+            document.getElementById(tempId).innerText = ai.text || 'Не удалось обработать ответ';
+        }
+
     } catch (e) {
         console.error(e);
-        document.getElementById(tempId).innerText = '❌ Ошибка связи с AI';
+        document.getElementById(tempId).innerText = '❌ Ошибка связи с финансовым ассистентом';
     }
 
     chat.scrollTop = chat.scrollHeight;
-}
+} 
         
         window.quickAdd = async (t, c, s, n) => {
             db.unshift({ id: Date.now(), t, c, s, n, d: new Date().toISOString().split('T')[0] });
@@ -611,6 +627,7 @@ async function askAI() {
     </script>
 </body>
 </html>
+
 
 
 
