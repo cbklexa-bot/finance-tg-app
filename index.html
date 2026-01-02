@@ -438,6 +438,7 @@ async function askAI() {
     const q = input.value.trim();
     if (!q) return;
 
+    // сообщение пользователя
     chat.innerHTML += `<div class="user-msg">${q}</div>`;
     input.value = '';
 
@@ -449,62 +450,83 @@ async function askAI() {
         const response = await fetch('/chat', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ prompt: q, history: db.slice(0, 20) })
+            body: JSON.stringify({
+                prompt: q,
+                context: {
+                    transactions: db,
+                    budgets: budgets,
+                    balance: db.reduce((a, i) => a + (i.t === 'inc' ? i.s : -i.s), 0),
+                    currency: "RUB"
+                }
+            })
         });
 
+        if (!response.ok) throw new Error('AI error');
+
         const raw = await response.json();
-        const content = raw?.choices?.[0]?.message?.content || "";
-        const jsonMatch = content.match(/\{[\s\S]*\}/);
-        
-        if (jsonMatch) {
-            const ai = JSON.parse(jsonMatch[0]);
+        const content = raw?.choices?.[0]?.message?.content || '';
+        const match = content.match(/\{[\s\S]*\}/);
 
-            if (ai.action === 'add') {
-                // ТВОЯ КАРТА ИКОНОК
-                const myCategories = {
-                    "продукты": "🛒",
-                    "авто": "🚗",
-                    "жильё": "🏠",
-                    "шопинг": "🛍️",
-                    "аптека": "💊",
-                    "подарки": "🎁",
-                    "отдых": "🎭",
-                    "прочее": "📦"
-                };
-
-                // Чистим название категории от ИИ
-                const rawCat = (ai.category || "прочее").toLowerCase().trim();
-                const finalIcon = myCategories[rawCat] || "📦";
-
-                const newEntry = {
-                    id: Date.now(),
-                    t: ai.type || 'exp',
-                    c: finalIcon, // Подставляем твою иконку
-                    s: parseFloat(ai.amount) || 0,
-                    n: ai.note || '',
-                    d: new Date().toISOString().split('T')[0]
-                };
-
-                // === АВТОЗАПИСЬ ===
-                db.unshift(newEntry);
-                if (typeof updateUI === 'function') updateUI();
-                if (typeof cloudSave === 'function') await cloudSave();
-                
-                document.getElementById(tempId).innerHTML = `
-                    <div style="color:var(--green)">✅ Записано в <b>${rawCat}</b></div>
-                    <div>${finalIcon} ${newEntry.s} ₽ (${newEntry.n})</div>
-                `;
-            } else {
-                document.getElementById(tempId).innerText = ai.text || content;
-            }
-        } else {
-            document.getElementById(tempId).innerText = content;
+        if (!match) {
+            document.getElementById(tempId).innerText = content || 'Нет ответа от AI';
+            return;
         }
+
+        const ai = JSON.parse(match[0]);
+
+        // === КАРТА КАТЕГОРИЙ ===
+        const catMap = {
+            продукты: '🛒',
+            авто: '🚗',
+            жильё: '🏠',
+            шопинг: '🛍️',
+            аптека: '💊',
+            подарки: '🎁',
+            отдых: '🎭',
+            прочее: '📦'
+        };
+
+        // === АВТОЗАПИСЬ ДОХОДА / РАСХОДА ===
+        if (ai.action === 'add') {
+            const icon = catMap[(ai.category || 'прочее').toLowerCase()] || '📦';
+
+            const entry = {
+                id: Date.now(),
+                t: ai.type === 'inc' ? 'inc' : 'exp',
+                c: icon,
+                s: Math.abs(Number(ai.amount)) || 0,
+                n: ai.note || 'Запись от AI',
+                d: new Date().toISOString().split('T')[0]
+            };
+
+            db.unshift(entry);
+            updateUI();
+            await cloudSave();
+
+            document.getElementById(tempId).innerHTML = `
+                <div style="color:var(--green); font-weight:700;">✅ Записано автоматически</div>
+                <div>${icon} <b>${entry.s} ₽</b> — ${entry.n}</div>
+            `;
+        }
+
+        // === АНАЛИЗ / СОВЕТ ===
+        else if (ai.action === 'analysis') {
+            document.getElementById(tempId).innerText = ai.text;
+        }
+
+        // === НЕОПОЗНАННЫЙ ОТВЕТ ===
+        else {
+            document.getElementById(tempId).innerText = ai.text || 'Не удалось обработать ответ';
+        }
+
     } catch (e) {
-        document.getElementById(tempId).innerText = "❌ Ошибка связи с ИИ";
+        console.error(e);
+        document.getElementById(tempId).innerText = '❌ Ошибка связи с финансовым ассистентом';
     }
+
     chat.scrollTop = chat.scrollHeight;
-}
+} 
+        
         window.quickAdd = async (t, c, s, n) => {
             db.unshift({ id: Date.now(), t, c, s, n, d: new Date().toISOString().split('T')[0] });
             updateUI(); await cloudSave(); go('home');
@@ -533,6 +555,7 @@ async function askAI() {
     </script>
 </body>
 </html>
+
 
 
 
