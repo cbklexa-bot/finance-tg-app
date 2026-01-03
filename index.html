@@ -24,6 +24,32 @@
         .active { display: block; }
         .active > *:not(.ai-controls) { animation: slideUp 0.3s ease; }
 
+        /* --- СТИЛИ БЛОКНОТА --- */
+        .tab-btn { flex:1; text-align:center; padding:10px; border-radius:10px; font-size:12px; font-weight:800; cursor:pointer; transition:0.2s; color: var(--text); }
+        .tab-btn.active { background: var(--card); color: var(--blue); box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
+        .note-view { display: none; }
+        .note-view.active { display: block; animation: slideUp 0.3s ease; }
+
+        /* Задачи */
+        .task-item { display:flex; align-items:center; background:var(--card); padding:12px; border-radius:15px; margin-bottom:8px; border:1px solid var(--border); }
+        .task-check { width:22px; height:22px; border-radius:50%; border:2px solid var(--text); margin-right:12px; display:flex; align-items:center; justify-content:center; cursor:pointer; transition:0.2s; }
+        .task-check.done { background:var(--green); border-color:var(--green); }
+        .task-check.done::after { content:"✓"; color:#fff; font-size:14px; font-weight:bold; }
+        .task-text { font-size:14px; font-weight:600; flex:1; }
+        .task-text.done { text-decoration:line-through; opacity:0.5; }
+
+        /* Привычки */
+        .habit-card { background:var(--card); border-radius:20px; padding:15px; border:1px solid var(--border); display:flex; flex-direction:column; align-items:center; text-align:center; }
+        .habit-circle { width:50px; height:50px; border-radius:50%; background:var(--btn-bg); display:flex; align-items:center; justify-content:center; margin:10px 0; cursor:pointer; transition:0.3s; border:3px solid transparent; }
+        .habit-circle.done { border-color:var(--green); background:rgba(48, 209, 88, 0.2); color:var(--green); transform:scale(1.1); }
+        .streak-count { font-size:10px; color:var(--text); font-weight:700; }
+
+        /* Заметки */
+        .note-card { background:var(--card); border-radius:18px; padding:15px; border:1px solid var(--border); margin-bottom:10px; cursor:pointer; }
+        .note-head { font-weight:800; font-size:15px; margin-bottom:5px; color:var(--main); }
+        .note-preview { font-size:12px; color:var(--text); display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
+
+        /* --- ОБЩИЕ СТИЛИ --- */
         .compact-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; padding: 0 5px; }
         .ticker-group { display: flex; gap: 15px; }
         .ticker { display: flex; flex-direction: column; }
@@ -34,7 +60,7 @@
         .sw-box::after { content: ""; position: absolute; width: 20px; height: 20px; left: 2px; top: 2px; background: var(--sw-ball); border-radius: 50%; transition: 0.25s; }
         .light .sw-box::after { transform: translateX(20px); }
 
-        #edit-modal, #budget-modal { 
+        #edit-modal, #budget-modal, #note-modal { 
             display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; 
             background: rgba(0,0,0,0.8); backdrop-filter: blur(10px); z-index: 2000; 
             justify-content: center; align-items: center; padding: 20px; box-sizing: border-box;
@@ -80,7 +106,6 @@
         .ai-msg { background: var(--card); padding: 12px; border-radius: 18px 18px 18px 5px; border: 1px solid var(--border); max-width: 85%; font-size: 14px; line-height: 1.4; }
         .user-msg { align-self: flex-end; background: var(--blue); color: white; padding: 12px; border-radius: 18px 18px 5px 18px; max-width: 85%; font-size: 14px; }
         
-        /* КАТЕГОРИИ В ЛИМИТАХ */
         .bud-cat-select { display: flex; gap: 10px; overflow-x: auto; padding: 10px 0; margin-bottom: 10px; scrollbar-width: none; }
         .bud-cat-item { 
             flex: 0 0 40px; height: 40px; border-radius: 50%; background: var(--btn-bg); 
@@ -96,10 +121,7 @@
             border-radius: 25px; border: 1px solid var(--border); 
             z-index: 100;
         }
-        .mic-btn { 
-            background: none; border: none; padding: 5px; cursor: pointer; 
-            display: flex; align-items: center; justify-content: center;
-        }
+        .mic-btn { background: none; border: none; padding: 5px; cursor: pointer; display: flex; align-items: center; justify-content: center; }
         .mic-btn svg { width: 20px; height: 20px; stroke: var(--text); fill: none; stroke-width: 2; transition: 0.3s; }
         .mic-btn.active svg { stroke: var(--red); transform: scale(1.2); filter: drop-shadow(0 0 5px var(--red)); }
 
@@ -133,6 +155,13 @@
         <button class="save-btn" style="margin-top:20px;" onclick="addBudget()">Сохранить</button>
         <button id="bud-del-btn" class="save-btn" style="background:var(--red); display:none; margin-top:10px;" onclick="deleteBudgetReal()">Удалить</button>
         <button class="note-in" style="margin-top:10px; background:none;" onclick="closeBudModal()">Отмена</button>
+    </div></div>
+
+    <div id="note-modal"><div class="modal-content" style="height:80vh; display:flex; flex-direction:column;">
+        <input type="text" id="note-title" class="sum-in" placeholder="Заголовок" style="font-size:20px; text-align:left;">
+        <textarea id="note-body" class="note-in" style="flex:1; margin:15px 0; text-align:left; resize:none;" placeholder="Текст заметки..."></textarea>
+        <button class="save-btn" onclick="saveNote()">Сохранить</button>
+        <button class="note-in" style="margin-top:10px; background:none;" onclick="document.getElementById('note-modal').style.display='none'">Закрыть</button>
     </div></div>
 
     <div id="p-home" class="page active">
@@ -193,20 +222,45 @@
         <div id="budget-list"></div>
     </div>
 
+    <div id="p-note" class="page">
+        <div class="compact-header"><span style="font-weight: 800; color: var(--text);">МОЙ ОРГАНАЙЗЕР</span></div>
+        
+        <div style="display:flex; gap:8px; background:var(--btn-bg); padding:4px; border-radius:12px; margin-bottom:15px;">
+            <div id="tab-tasks" class="tab-btn active" onclick="switchNoteTab('tasks')">Задачи</div>
+            <div id="tab-habits" class="tab-btn" onclick="switchNoteTab('habits')">Привычки</div>
+            <div id="tab-notes" class="tab-btn" onclick="switchNoteTab('notes')">Заметки</div>
+        </div>
+
+        <div id="view-tasks" class="note-view active">
+            <div class="input-section">
+                <input type="text" id="task-in" class="note-in" placeholder="Новая задача..." style="text-align:left;">
+                <div style="display:flex; gap:5px; margin-top:5px;">
+                    <input type="date" id="task-date" class="date-in" style="flex:1;">
+                    <button class="save-btn" style="width:auto; padding:0 15px;" onclick="addTask()">+</button>
+                </div>
+            </div>
+            <h4 style="margin:10px 0 5px; color:var(--text); font-size:12px;">СЕГОДНЯ И ПРЕДСТОЯЩИЕ</h4>
+            <div id="task-list"></div>
+        </div>
+
+        <div id="view-habits" class="note-view">
+            <div class="input-section" style="flex-direction:row; align-items:center;">
+                <input type="text" id="habit-in" class="note-in" placeholder="Новая привычка..." style="text-align:left; margin:0;">
+                <button class="save-btn" style="width:50px; margin-left:10px;" onclick="addHabit()">+</button>
+            </div>
+            <div id="habit-list" style="display:grid; grid-template-columns: 1fr 1fr; gap:10px; margin-top:10px;"></div>
+        </div>
+
+        <div id="view-notes" class="note-view">
+            <button class="save-btn" style="width:100%; margin-bottom:15px;" onclick="openNoteModal()">+ Создать заметку</button>
+            <div id="note-list"></div>
+        </div>
+    </div>
+
     <div id="p-ai" class="page">
         <div class="compact-header"><span style="font-weight: 800; color: var(--text);">FINANCE AI Ассистент</span></div>
         <div id="ai-chat" style="height: calc(100vh - 210px); overflow-y: auto; display: flex; flex-direction: column; gap: 10px; padding-bottom: 80px;">
-            <div class="ai-msg">
-    Привет! Я твой личный финансовый помощник 💼<br><br>
-    Я могу:<br>
-    • записывать доходы и расходы<br>
-    • анализировать твой бюджет<br>
-    • находить лишние траты<br>
-    • давать советы по финансовой дисциплине<br><br>
-    Просто напиши:<br>
-    <b>«Такси 500»</b>, <b>«Зарплата 120000»</b> или <b>«Проанализируй мои траты»</b>
-</div>
-
+            <div class="ai-msg">Привет! Я твой личный финансовый помощник 💼</div>
         </div>
         <div class="ai-controls">
             <button id="mic-btn" class="mic-btn" onclick="toggleVoice()">
@@ -223,6 +277,7 @@
         <div class="n-item active" onclick="go('home')"><svg viewBox="0 0 24 24"><path d="M3 9.5L12 3l9 6.5V20a1 1 0 01-1 1h-5v-7h-4v7H4a1 1 0 01-1-1V9.5z"/></svg>Главная</div>
         <div class="n-item" onclick="go('an')"><svg viewBox="0 0 24 24"><path d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>История</div>
         <div class="n-item" onclick="go('bud')"><svg viewBox="0 0 24 24"><path d="M9 7h6m-6 4h6m-6 4h6M5 21h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v14a2 2 0 002 2z"/></svg>Бюджет</div>
+        <div class="n-item" onclick="go('note')"><svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline></svg>Блокнот</div>
         <div class="n-item" onclick="go('ai')"><svg viewBox="0 0 24 24"><path d="M12 2a10 10 0 00-7.74 16.33l-1.13 3.38a1 1 0 001.26 1.26l3.38-1.13A10 10 0 1012 2z"/></svg>AI</div>
     </nav>
 
@@ -234,6 +289,10 @@
         let userId = tg.initDataUnsafe?.user?.id?.toString() || 'user_demo';
         let db = [];
         let budgets = JSON.parse(localStorage.getItem('fin_budgets_' + userId)) || [];
+        // === ПЕРЕМЕННЫЕ БЛОКНОТА ===
+        let tasks = [], habits = [], notes = [];
+        let editingNoteId = null;
+
         let mode = 'exp', currentCat = '🛒', currentSlide = 0, touchStartX = 0, editingBudIdx = null, editingId = null;
         let budSelectedCat = '🛒';
         let isListening = false;
@@ -244,6 +303,169 @@
             inc: [{n:'Зарплата', i:'💵'}, {n:'Инвест', i:'📈'}, {n:'Подарок', i:'🎁'}, {n:'Прочее', i:'📦'}]
         };
 
+        // === ЛОГИКА БЛОКНОТА ===
+        function switchNoteTab(tab) {
+            document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+            document.querySelectorAll('.note-view').forEach(v => v.classList.remove('active'));
+            document.getElementById('tab-'+tab).classList.add('active');
+            document.getElementById('view-'+tab).classList.add('active');
+        }
+
+        // --- Задачи ---
+        function addTask() {
+            const txt = document.getElementById('task-in').value;
+            const date = document.getElementById('task-date').value;
+            if(!txt) return;
+            tasks.push({ id: Date.now(), text: txt, date: date, done: false });
+            document.getElementById('task-in').value = '';
+            saveNotebook(); renderTasks();
+        }
+
+        function toggleTask(id) {
+            const t = tasks.find(x => x.id === id);
+            if(t) { t.done = !t.done; saveNotebook(); renderTasks(); }
+        }
+
+        function deleteTask(id) {
+            if(confirm('Удалить задачу?')) {
+                tasks = tasks.filter(x => x.id !== id);
+                saveNotebook(); renderTasks();
+            }
+        }
+
+        function renderTasks() {
+            tasks.sort((a,b) => (a.done === b.done) ? 0 : a.done ? 1 : -1);
+            document.getElementById('task-list').innerHTML = tasks.map(t => `
+                <div class="task-item">
+                    <div class="task-check ${t.done?'done':''}" onclick="toggleTask(${t.id})"></div>
+                    <div class="task-text ${t.done?'done':''}" onclick="deleteTask(${t.id})">
+                        ${t.text} <small style="display:block; font-weight:400; font-size:10px; color:var(--text);">${t.date||''}</small>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        // --- Привычки ---
+        function addHabit() {
+            const name = document.getElementById('habit-in').value;
+            if(!name) return;
+            habits.push({ id: Date.now(), name: name, history: [] });
+            document.getElementById('habit-in').value = '';
+            saveNotebook(); renderHabits();
+        }
+
+        function toggleHabit(id) {
+            const h = habits.find(x => x.id === id);
+            const today = new Date().toISOString().split('T')[0];
+            if(h.history.includes(today)) h.history = h.history.filter(d => d !== today);
+            else { h.history.push(today); tg.HapticFeedback.notificationOccurred('success'); }
+            saveNotebook(); renderHabits();
+        }
+
+        function deleteHabit(id) {
+             if(confirm('Удалить привычку?')) {
+                habits = habits.filter(x => x.id !== id);
+                saveNotebook(); renderHabits();
+             }
+        }
+
+        function renderHabits() {
+            const today = new Date().toISOString().split('T')[0];
+            document.getElementById('habit-list').innerHTML = habits.map(h => `
+                <div class="habit-card">
+                    <div style="font-weight:700; font-size:13px;">${h.name}</div>
+                    <div class="habit-circle ${h.history.includes(today)?'done':''}" onclick="toggleHabit(${h.id})">🔥</div>
+                    <div class="streak-count">Дней: ${h.history.length}</div>
+                    <div style="font-size:10px; color:var(--red); margin-top:5px;" onclick="deleteHabit(${h.id})">удалить</div>
+                </div>`).join('');
+        }
+
+        // --- Заметки ---
+        function openNoteModal(id = null) {
+            editingNoteId = id;
+            if(id) {
+                const n = notes.find(x => x.id === id);
+                document.getElementById('note-title').value = n.title;
+                document.getElementById('note-body').value = n.body;
+            } else {
+                document.getElementById('note-title').value = '';
+                document.getElementById('note-body').value = '';
+            }
+            document.getElementById('note-modal').style.display = 'flex';
+        }
+
+        function saveNote() {
+            const title = document.getElementById('note-title').value;
+            const body = document.getElementById('note-body').value;
+            if(!title && !body) return;
+            if(editingNoteId) {
+                const n = notes.find(x => x.id === editingNoteId);
+                n.title = title; n.body = body; n.date = new Date().toLocaleDateString();
+            } else {
+                notes.unshift({ id: Date.now(), title: title || 'Без названия', body: body, date: new Date().toLocaleDateString() });
+            }
+            document.getElementById('note-modal').style.display = 'none';
+            saveNotebook(); renderNotes();
+        }
+
+        function deleteNote(e, id) {
+            e.stopPropagation();
+            if(confirm('Удалить заметку?')) {
+                notes = notes.filter(x => x.id !== id);
+                saveNotebook(); renderNotes();
+            }
+        }
+
+        function renderNotes() {
+            document.getElementById('note-list').innerHTML = notes.map(n => `
+                <div class="note-card" onclick="openNoteModal(${n.id})">
+                    <div style="display:flex; justify-content:space-between;">
+                        <div class="note-head">${n.title}</div>
+                        <div style="color:var(--red); font-size:12px;" onclick="deleteNote(event, ${n.id})">✕</div>
+                    </div>
+                    <div class="note-preview">${n.body}</div>
+                    <div style="font-size:10px; color:var(--text); margin-top:5px;">${n.date}</div>
+                </div>
+            `).join('');
+        }
+
+        // --- Сохранение и Синхронизация Блокнота ---
+        async function cloudSaveNotebook() {
+            const notebookData = { tasks, habits, notes };
+            const { error } = await _supabase.from('notebook').upsert({ id: userId, data: notebookData, updated_at: new Date() }, { onConflict: 'id' });
+        }
+
+        function saveNotebook() {
+            localStorage.setItem('fin_tasks_' + userId, JSON.stringify(tasks));
+            localStorage.setItem('fin_habits_' + userId, JSON.stringify(habits));
+            localStorage.setItem('fin_notes_' + userId, JSON.stringify(notes));
+            cloudSaveNotebook();
+        }
+
+        function loadNotebook() {
+            const t = localStorage.getItem('fin_tasks_' + userId);
+            const h = localStorage.getItem('fin_habits_' + userId);
+            const n = localStorage.getItem('fin_notes_' + userId);
+            if(t) tasks = JSON.parse(t);
+            if(h) habits = JSON.parse(h);
+            if(n) notes = JSON.parse(n);
+            renderTasks(); renderHabits(); renderNotes();
+        }
+
+        async function syncNotebookFromCloud() {
+            try {
+                const { data } = await _supabase.from('notebook').select('data').eq('id', userId).single();
+                if (data && data.data) {
+                    tasks = data.data.tasks || [];
+                    habits = data.data.habits || [];
+                    notes = data.data.notes || [];
+                    saveNotebook(); // обновит локалсторадж
+                    renderTasks(); renderHabits(); renderNotes();
+                }
+            } catch (e) {}
+        }
+
+        // === СТАРЫЙ ФУНКЦИОНАЛ ===
         const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
         let recognition = null;
         if (SpeechRecognition) {
@@ -264,9 +486,9 @@
             document.querySelectorAll('.page').forEach(e => e.classList.remove('active'));
             document.querySelectorAll('.n-item').forEach(e => e.classList.remove('active'));
             document.getElementById('p-'+p).classList.add('active');
-            const idx = ['home', 'an', 'bud', 'ai'].indexOf(p);
+            const idx = ['home', 'an', 'bud', 'note', 'ai'].indexOf(p);
             document.querySelectorAll('.n-item')[idx].classList.add('active');
-            updateUI();
+            if(p !== 'note') updateUI();
         }
 
         async function syncFromCloud() {
@@ -315,7 +537,6 @@
             let tLimit = 0, tSpent = 0;
 
             list.innerHTML = budgets.map((b, i) => {
-                // СВЯЗЬ: Считаем расходы только по иконке этого лимита за текущий месяц
                 const spent = db.filter(t => t.t === 'exp' && t.c === b.cat && t.d.startsWith(curMonth)).reduce((a,c)=>a+c.s, 0);
                 tLimit += b.limit; tSpent += spent; 
                 const perc = Math.min((spent/b.limit)*100, 100);
@@ -363,7 +584,7 @@
 
         function deleteBudgetReal() { budgets.splice(editingBudIdx, 1); closeBudModal(); updateUI(); cloudSave(); }
 
-        // Отрисовка графиков
+        // Графики
         function renderDayChart() {
             const chart = document.getElementById('day-chart');
             const today = new Date().toISOString().split('T')[0];
@@ -403,92 +624,38 @@
         }
 
         function renderMonthChart() {
-    const svg = document.getElementById('month-chart');
-    const pointsCount = 6; // Количество точек на графике
-    const daysPerBlock = 5; // Шаг (5 дней)
-    const sums = new Array(pointsCount).fill(0);
-    const labels = new Array(pointsCount).fill('');
-    
-    // Текущая дата (конец графика)
-    const now = new Date();
-    now.setHours(23, 59, 59, 999);
+            const svg = document.getElementById('month-chart');
+            const pointsCount = 6; const daysPerBlock = 5; 
+            const sums = new Array(pointsCount).fill(0); const labels = new Array(pointsCount).fill('');
+            const now = new Date(); now.setHours(23, 59, 59, 999);
+            for(let i = 0; i < pointsCount; i++) {
+                const offset = pointsCount - 1 - i; 
+                const minDaysAgo = offset * daysPerBlock; const maxDaysAgo = (offset + 1) * daysPerBlock; 
+                const labelDate = new Date(); labelDate.setDate(now.getDate() - minDaysAgo);
+                labels[i] = `${String(labelDate.getDate()).padStart(2,'0')}.${String(labelDate.getMonth()+1).padStart(2,'0')}`;
+                sums[i] = db.filter(item => {
+                    if (item.t !== 'exp') return false;
+                    const diffDays = (now - new Date(item.d)) / (1000 * 60 * 60 * 24);
+                    return diffDays >= minDaysAgo && diffDays < maxDaysAgo;
+                }).reduce((a, b) => a + b.s, 0);
+            }
+            const max = Math.max(...sums, 1000) * 1.3;
+            const points = sums.map((v, i) => ({ x: 40 + i * 48, y: 140 - (v / max) * 100 }));
+            const linePath = points.map((p, i) => (i === 0 ? 'M' : 'L') + `${p.x},${p.y}`).join(' ');
+            const areaPath = linePath + ` L${points[points.length-1].x},140 L${points[0].x},140 Z`;
 
-    // 1. Проходим слева направо (i=0 — это самая старая точка, i=5 — сегодня)
-    for(let i = 0; i < pointsCount; i++) {
-        // Рассчитываем, насколько далеко в прошлом эта точка
-        // Если i=0 (лево), offset=5 (25 дней назад)
-        // Если i=5 (право), offset=0 (0 дней назад)
-        const offset = pointsCount - 1 - i; 
+            svg.innerHTML = `<defs><linearGradient id="gm" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="var(--blue)" stop-opacity="0.3"/><stop offset="100%" stop-color="transparent"/></linearGradient></defs>
+                <path d="${areaPath}" fill="url(#gm)" />
+                <path d="${linePath}" fill="none" stroke="var(--blue)" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+                ${points.map((p, i) => `<circle cx="${p.x}" cy="${p.y}" r="4" fill="var(--card)" stroke="var(--blue)" stroke-width="2"/>
+                <text x="${p.x}" y="${p.y-12}" text-anchor="middle" fill="var(--main)" font-size="8" font-weight="900">${sums[i] > 0 ? Math.round(sums[i]) : ''}</text>
+                <text x="${p.x}" y="165" text-anchor="middle" fill="var(--text)" font-size="8">${labels[i]}</text>`).join('')}`;
+        }
 
-        const minDaysAgo = offset * daysPerBlock;       
-        const maxDaysAgo = (offset + 1) * daysPerBlock; 
-
-        // Генерируем красивую дату для подписи (например "25.05")
-        const labelDate = new Date();
-        labelDate.setDate(now.getDate() - minDaysAgo);
-        const day = String(labelDate.getDate()).padStart(2, '0');
-        const month = String(labelDate.getMonth() + 1).padStart(2, '0');
-        labels[i] = `${day}.${month}`;
-
-        // Фильтруем и суммируем траты для этого периода
-        sums[i] = db.filter(item => {
-            if (item.t !== 'exp') return false;
-            
-            const itemDate = new Date(item.d);
-            const diffTime = now - itemDate;
-            const diffDays = diffTime / (1000 * 60 * 60 * 24);
-
-            // Берем траты, которые попадают в этот блок времени
-            return diffDays >= minDaysAgo && diffDays < maxDaysAgo;
-        }).reduce((a, b) => a + b.s, 0);
-    }
-
-    // 2. Масштаб графика
-    const max = Math.max(...sums, 1000) * 1.3;
-
-    // 3. Координаты точек
-    const points = sums.map((v, i) => ({ 
-        x: 40 + i * 48, 
-        y: 140 - (v / max) * 100 
-    }));
-
-    // 4. Рисуем линии
-    const linePath = points.map((p, i) => (i === 0 ? 'M' : 'L') + `${p.x},${p.y}`).join(' ');
-    const areaPath = linePath + ` L${points[points.length-1].x},140 L${points[0].x},140 Z`;
-
-    // 5. Выводим SVG
-    svg.innerHTML = `
-        <defs>
-            <linearGradient id="gm" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stop-color="var(--blue)" stop-opacity="0.3"/>
-                <stop offset="100%" stop-color="transparent"/>
-            </linearGradient>
-        </defs>
-        
-        <path d="${areaPath}" fill="url(#gm)" />
-        
-        <path d="${linePath}" fill="none" stroke="var(--blue)" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
-        
-        ${points.map((p, i) => {
-            // Сумма над точкой (если есть траты)
-            const valLabel = sums[i] > 0 ? Math.round(sums[i]) : '';
-            
-            return `
-            <circle cx="${p.x}" cy="${p.y}" r="4" fill="var(--card)" stroke="var(--blue)" stroke-width="2"/>
-            
-            <text x="${p.x}" y="${p.y-12}" text-anchor="middle" fill="var(--main)" font-size="8" font-weight="900">${valLabel}</text>
-            
-            <text x="${p.x}" y="165" text-anchor="middle" fill="var(--text)" font-size="8">${labels[i]}</text>
-            `;
-        }).join('')}
-    `;
-}
         function drawCharts() {
             document.getElementById('chart-slider').style.transform = `translateX(-${currentSlide * 100}%)`;
             document.querySelectorAll('.dot').forEach((d, i) => d.classList.toggle('active', i === currentSlide));
-            if(currentSlide === 0) renderDayChart();
-            if(currentSlide === 1) renderWeekChart();
-            if(currentSlide === 2) renderMonthChart();
+            if(currentSlide === 0) renderDayChart(); if(currentSlide === 1) renderWeekChart(); if(currentSlide === 2) renderMonthChart();
         }
 
         function tS(e) { touchStartX = e.changedTouches[0].screenX; }
@@ -513,20 +680,16 @@ async function askAI() {
     input.value = '';
 
     const tempId = 'ai-' + Date.now();
-    chat.innerHTML += `<div id="${tempId}" class="ai-msg">📊 Анализирую...</div>`;
+    chat.innerHTML += `<div id="${tempId}" class="ai-msg">🤖 Думаю и анализирую…</div>`;
     chat.scrollTop = chat.scrollHeight;
 
     try {
-        const historyText = db.slice(0, 30).map(e =>
-            `${e.d} | ${e.t === 'inc' ? 'Доход' : 'Расход'} | ${e.c} | ${e.s} ₽ | ${e.n}`
-        ).join('\n');
-
         const response = await fetch('/chat', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 prompt: q,
-                history: historyText
+                history: db.slice(0, 200) // ⬅️ ПЕРЕДАЁМ МАССИВ, НЕ ТЕКСТ
             })
         });
 
@@ -541,24 +704,40 @@ async function askAI() {
 
         const ai = JSON.parse(jsonMatch[0]);
 
-        // === АВТОЗАПИСЬ ===
-        if (ai.action === 'add') {
-            const catMap = {
-                продукты: "🛒",
-                авто: "🚗",
-                жильё: "🏠",
-                шопинг: "🛍️",
-                аптека: "💊",
-                подарки: "🎁",
-                отдых: "🎭",
-                прочее: "📦"
-            };
+        /* ===== НОРМАЛИЗАЦИЯ КАТЕГОРИЙ ===== */
+        const catAliases = {
+            авто: ["авто","машина","бензин","заправ","топливо","азс","мойка"],
+            продукты: ["продукты","еда","магазин","супермаркет"],
+            жильё: ["жиль","квартир","коммун","интернет","свет","вода"],
+            шопинг: ["шопинг","одежд","техника","покупк"],
+            аптека: ["аптек","лекарств","таблет"],
+            подарки: ["подар","цвет","донат"],
+            отдых: ["отдых","кафе","ресторан","кино"]
+        };
 
+        function resolveCategory(cat = "") {
+            cat = cat.toLowerCase();
+            for (const [key, arr] of Object.entries(catAliases)) {
+                if (arr.some(w => cat.includes(w))) return key;
+            }
+            return "прочее";
+        }
+
+        const iconMap = {
+            продукты:"🛒", авто:"🚗", жильё:"🏠",
+            шопинг:"🛍️", аптека:"💊",
+            подарки:"🎁", отдых:"🎭",
+            прочее:"📦"
+        };
+
+        /* ===== АВТОЗАПИСЬ ===== */
+        if (ai.action === 'add') {
+            const catKey = resolveCategory(ai.category);
             const entry = {
                 id: Date.now(),
-                t: ai.type || 'exp',
-                c: catMap[ai.category] || "📦",
-                s: Number(ai.amount),
+                t: ai.type === 'inc' ? 'inc' : 'exp',
+                c: iconMap[catKey],
+                s: Number(ai.amount) || 0,
                 n: ai.note || '',
                 d: new Date().toISOString().split('T')[0]
             };
@@ -569,11 +748,12 @@ async function askAI() {
 
             document.getElementById(tempId).innerHTML = `
                 ✅ <b>Записано</b><br>
-                ${entry.c} ${entry.s} ₽ — ${entry.n}
+                ${entry.c} ${entry.s.toLocaleString()} ₽ — ${entry.n}
             `;
+            return;
         }
 
-        // === ЧАТ / АНАЛИЗ ===
+        /* ===== АНАЛИЗ / ЧАТ ===== */
         if (ai.action === 'chat') {
             document.getElementById(tempId).innerText = ai.text;
         }
@@ -584,11 +764,9 @@ async function askAI() {
     }
 
     chat.scrollTop = chat.scrollHeight;
-}       
-        window.quickAdd = async (t, c, s, n) => {
-            db.unshift({ id: Date.now(), t, c, s, n, d: new Date().toISOString().split('T')[0] });
-            updateUI(); await cloudSave(); go('home');
-        };
+}      
+        
+        window.quickAdd = async (t, c, s, n) => { db.unshift({ id: Date.now(), t, c, s, n, d: new Date().toISOString().split('T')[0] }); updateUI(); await cloudSave(); go('home'); };
 
         function setMode(m) { mode = m; currentCat = cats[m][0].i; renderCats(); document.getElementById('btn-exp').style.background = m === 'exp' ? 'var(--blue)' : 'transparent'; document.getElementById('btn-inc').style.background = m === 'inc' ? 'var(--blue)' : 'transparent'; }
         function toggleBlur() { document.getElementById('bal').classList.toggle('blurred'); tg.HapticFeedback.impactOccurred('light'); }
@@ -608,11 +786,17 @@ async function askAI() {
 
         window.onload = () => { 
             document.getElementById('date-picker').value = new Date().toISOString().split('T')[0];
-            tg.expand(); syncFromCloud(); getRates(); 
+            document.getElementById('task-date').value = new Date().toISOString().split('T')[0];
+            tg.expand(); 
+            syncFromCloud(); 
+            loadNotebook(); // Загрузка блокнота локально
+            syncNotebookFromCloud(); // Загрузка блокнота из облака
+            getRates(); 
         };
     </script>
 </body>
 </html>
+
 
 
 
