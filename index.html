@@ -1244,16 +1244,7 @@ async function syncNotebookFromCloud() {
     }
 }
 
-       window.onload = async () => {
-    // Выводим ID прямо в заголовок баланса, чтобы точно увидеть
-    setTimeout(() => {
-        const balLabel = document.querySelector('.bal-label');
-        if (balLabel) {
-            balLabel.innerText = "ТВОЙ ID: " + userId;
-            balLabel.style.color = "var(--blue)";
-            balLabel.style.fontSize = "20px";
-        }
-    }, 1000);
+       window.onload = async () => { 
     // Установка дат
     document.getElementById('date-picker').value = new Date().toISOString().split('T')[0];
     document.getElementById('task-date').value = new Date().toISOString().split('T')[0];
@@ -1334,6 +1325,7 @@ async function editGoalName() {
     </script>
 </body>
 </html>
+
 
 
 
