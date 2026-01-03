@@ -943,7 +943,7 @@ async function askAI() {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 prompt: q,
-                history: db.slice(0, 300) // ВСЕГДА массив
+                history: db.slice(0, 300) // ⬅️ ВСЕГДА массив
             })
         });
 
@@ -952,7 +952,7 @@ async function askAI() {
         }
 
         const raw = await response.json();
-        const content = raw?.choices?.[0]?.message?.content;
+        const content = raw?.choices?.[0]?.message?.content || '';
 
         if (!content) {
             document.getElementById(tempId).innerText =
@@ -960,19 +960,23 @@ async function askAI() {
             return;
         }
 
-        let ai;
-        try {
-            ai = JSON.parse(content);
-        } catch {
-            // Если AI ответил обычным текстом
-            document.getElementById(tempId).innerText = content;
-            return;
+        // ===== КЛЮЧЕВОЙ ФИКС =====
+        // Ищем JSON внутри любого текста
+        const jsonMatch = content.match(/\{[\s\S]*?\}/);
+
+        let ai = null;
+        if (jsonMatch) {
+            try {
+                ai = JSON.parse(jsonMatch[0]);
+            } catch (e) {
+                console.warn('Ошибка парсинга JSON от AI', e);
+            }
         }
 
         /* ===== НОРМАЛИЗАЦИЯ КАТЕГОРИЙ ===== */
         const catAliases = {
             авто: ["авто","машина","бензин","заправ","топливо","азс","мойка"],
-            продукты: ["продукты","еда","магазин","супермаркет"],
+            продукты: ["продукты","еда","магазин","супермаркет","хлеб"],
             жильё: ["жиль","квартир","коммун","интернет","свет","вода"],
             шопинг: ["шопинг","одежд","техника","покупк"],
             аптека: ["аптек","лекарств","таблет"],
@@ -989,29 +993,35 @@ async function askAI() {
         }
 
         const iconMap = {
-            продукты:"🛒", авто:"🚗", жильё:"🏠",
-            шопинг:"🛍️", аптека:"💊",
-            подарки:"🎁", отдых:"🎭",
-            прочее:"📦"
+            продукты: "🛒",
+            авто: "🚗",
+            жильё: "🏠",
+            шопинг: "🛍️",
+            аптека: "💊",
+            подарки: "🎁",
+            отдых: "🎭",
+            прочее: "📦"
         };
 
         /* ===== ДОБАВЛЕНИЕ ТРАНЗАКЦИИ ===== */
-        if (ai.action === 'add') {
-            const catKey = resolveCategory(ai.category);
+        if (ai && ai.action === 'add') {
+            const catKey = resolveCategory(ai.category || '');
+            const amount = Number(ai.amount);
+
+            if (!amount || amount <= 0) {
+                document.getElementById(tempId).innerText =
+                    '⚠️ Не смог корректно определить сумму.';
+                return;
+            }
+
             const entry = {
                 id: Date.now(),
                 t: ai.type === 'inc' ? 'inc' : 'exp',
                 c: iconMap[catKey],
-                s: Number(ai.amount) || 0,
+                s: amount,
                 n: ai.note || '',
                 d: new Date().toISOString().split('T')[0]
             };
-
-            if (entry.s <= 0) {
-                document.getElementById(tempId).innerText =
-                    '⚠️ Не смог определить сумму. Напиши иначе.';
-                return;
-            }
 
             db.unshift(entry);
             updateUI();
@@ -1025,8 +1035,12 @@ async function askAI() {
         }
 
         /* ===== АНАЛИЗ / ЧАТ ===== */
-        document.getElementById(tempId).innerText =
-            ai.text || content || '🤖 Я здесь. Спроси иначе.';
+        if (ai && ai.action === 'chat') {
+            document.getElementById(tempId).innerText = ai.text;
+        } else {
+            // fallback — обычный текст
+            document.getElementById(tempId).innerText = content;
+        }
 
     } catch (e) {
         console.error(e);
@@ -1036,6 +1050,7 @@ async function askAI() {
 
     chat.scrollTop = chat.scrollHeight;
 }
+
       
         
         window.quickAdd = async (t, c, s, n) => { db.unshift({ id: Date.now(), t, c, s, n, d: new Date().toISOString().split('T')[0] }); updateUI(); await cloudSave(); go('home'); };
@@ -1172,6 +1187,7 @@ async function editGoalName() {
     </script>
 </body>
 </html>
+
 
 
 
