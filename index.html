@@ -24,11 +24,19 @@
         .active { display: block; }
         .active > *:not(.ai-controls) { animation: slideUp 0.3s ease; }
 
-        /* --- СТИЛИ БЛОКНОТА --- */
-        .tab-btn { flex:1; text-align:center; padding:10px; border-radius:10px; font-size:12px; font-weight:800; cursor:pointer; transition:0.2s; color: var(--text); }
+        /* --- СТИЛИ БЛОКНОТА И КАЛЕНДАРЯ --- */
+        .tab-btn { flex:1; text-align:center; padding:10px; border-radius:10px; font-size:11px; font-weight:800; cursor:pointer; transition:0.2s; color: var(--text); white-space: nowrap; }
         .tab-btn.active { background: var(--card); color: var(--blue); box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
         .note-view { display: none; }
         .note-view.active { display: block; animation: slideUp 0.3s ease; }
+
+        /* Календарь */
+        .calendar-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 5px; background: var(--card); padding: 10px; border-radius: 15px; border: 1px solid var(--border); margin-bottom: 15px; }
+        .cal-day { text-align: center; padding: 8px 0; font-size: 14px; border-radius: 8px; cursor: pointer; color: var(--text); position: relative; }
+        .cal-day.active { background: var(--blue); color: white; font-weight: bold; }
+        .cal-day.today { color: var(--blue); font-weight: 800; border: 1px solid var(--blue); }
+        .cal-day.has-tasks::after { content:""; display:block; width:4px; height:4px; background:var(--green); border-radius:50%; margin:2px auto 0; }
+        .cal-weekday { text-align: center; font-size: 10px; color: var(--text); font-weight: 800; padding-bottom: 5px; }
 
         /* Задачи */
         .task-item { display:flex; align-items:center; background:var(--card); padding:12px; border-radius:15px; margin-bottom:8px; border:1px solid var(--border); }
@@ -223,23 +231,28 @@
     </div>
 
     <div id="p-note" class="page">
-        <div class="compact-header"><span style="font-weight: 800; color: var(--text);">МОЙ ОРГАНАЙЗЕР</span></div>
+        <div class="compact-header"><span style="font-weight: 800; color: var(--text);">ПЛАНИРОВЩИК</span></div>
         
-        <div style="display:flex; gap:8px; background:var(--btn-bg); padding:4px; border-radius:12px; margin-bottom:15px;">
-            <div id="tab-tasks" class="tab-btn active" onclick="switchNoteTab('tasks')">Задачи</div>
-            <div id="tab-habits" class="tab-btn" onclick="switchNoteTab('habits')">Привычки</div>
-            <div id="tab-notes" class="tab-btn" onclick="switchNoteTab('notes')">Заметки</div>
+        <div style="display:flex; gap:5px; background:var(--btn-bg); padding:4px; border-radius:12px; margin-bottom:15px; overflow-x: auto;">
+            <div id="tab-cal" class="tab-btn active" onclick="switchNoteTab('cal')">📅 Календарь</div>
+            <div id="tab-tasks" class="tab-btn" onclick="switchNoteTab('tasks')">✅ Список дел</div>
+            <div id="tab-habits" class="tab-btn" onclick="switchNoteTab('habits')">🔄 Привычки</div>
+            <div id="tab-notes" class="tab-btn" onclick="switchNoteTab('notes')">📝 Дневник</div>
         </div>
 
-        <div id="view-tasks" class="note-view active">
+        <div id="view-cal" class="note-view active">
+            <div id="calendar-container"></div>
+            <div id="selected-date-tasks"></div>
+        </div>
+
+        <div id="view-tasks" class="note-view">
             <div class="input-section">
                 <input type="text" id="task-in" class="note-in" placeholder="Новая задача..." style="text-align:left;">
                 <div style="display:flex; gap:5px; margin-top:5px;">
                     <input type="date" id="task-date" class="date-in" style="flex:1;">
-                    <button class="save-btn" style="width:auto; padding:0 15px;" onclick="addTask()">+</button>
+                    <button class="save-btn" style="width:auto; padding:0 15px;" onclick="addTask()">OK</button>
                 </div>
             </div>
-            <h4 style="margin:10px 0 5px; color:var(--text); font-size:12px;">СЕГОДНЯ И ПРЕДСТОЯЩИЕ</h4>
             <div id="task-list"></div>
         </div>
 
@@ -309,6 +322,47 @@
             document.querySelectorAll('.note-view').forEach(v => v.classList.remove('active'));
             document.getElementById('tab-'+tab).classList.add('active');
             document.getElementById('view-'+tab).classList.add('active');
+            if(tab === 'cal') renderCalendar();
+        }
+
+        // --- Календарь ---
+        function renderCalendar() {
+            const container = document.getElementById('calendar-container');
+            const now = new Date();
+            const year = now.getFullYear();
+            const month = now.getMonth();
+            const firstDay = new Date(year, month, 1).getDay();
+            const daysInMonth = new Date(year, month + 1, 0).getDate();
+            
+            let html = `<div style="text-align:center; margin-bottom:10px; font-weight:800;">${now.toLocaleString('ru', {month: 'long'})} ${year}</div>`;
+            html += `<div class="calendar-grid">`;
+            const weekdays = ['Пн','Вт','Ср','Чт','Пт','Сб','Вс'];
+            weekdays.forEach(w => html += `<div class="cal-weekday">${w}</div>`);
+            
+            for(let i = 1; i < (firstDay || 7); i++) html += `<div></div>`;
+            
+            for(let d = 1; d <= daysInMonth; d++) {
+                const dateStr = `${year}-${String(month+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+                const isToday = new Date().toISOString().split('T')[0] === dateStr;
+                const hasTasks = tasks.some(t => t.date === dateStr);
+                html += `<div class="cal-day ${isToday?'today':''} ${hasTasks?'has-tasks':''}" onclick="filterTasksByDate('${dateStr}')">${d}</div>`;
+            }
+            html += `</div>`;
+            container.innerHTML = html;
+        }
+
+        function filterTasksByDate(date) {
+            const filtered = tasks.filter(t => t.date === date);
+            const list = document.getElementById('selected-date-tasks');
+            if (filtered.length === 0) {
+                list.innerHTML = `<div style="padding:10px; font-size:12px; color:var(--text); text-align:center;">На ${date} дел нет</div>`;
+            } else {
+                list.innerHTML = `<h4 style="font-size:12px; margin-bottom:10px;">Задачи на ${date}:</h4>` + 
+                filtered.map(t => `<div class="task-item" style="margin-bottom:5px;">
+                    <div class="task-check ${t.done?'done':''}" onclick="toggleTask(${t.id})"></div>
+                    <div class="task-text ${t.done?'done':''}">${t.text}</div>
+                </div>`).join('');
+            }
         }
 
         // --- Задачи ---
@@ -323,7 +377,7 @@
 
         function toggleTask(id) {
             const t = tasks.find(x => x.id === id);
-            if(t) { t.done = !t.done; saveNotebook(); renderTasks(); }
+            if(t) { t.done = !t.done; saveNotebook(); renderTasks(); if(document.getElementById('view-cal').classList.contains('active')) renderCalendar(); }
         }
 
         function deleteTask(id) {
@@ -489,6 +543,7 @@
             const idx = ['home', 'an', 'bud', 'note', 'ai'].indexOf(p);
             document.querySelectorAll('.n-item')[idx].classList.add('active');
             if(p !== 'note') updateUI();
+            if(p === 'note' && document.getElementById('tab-cal').classList.contains('active')) renderCalendar();
         }
 
         async function syncFromCloud() {
@@ -796,6 +851,7 @@ async function askAI() {
     </script>
 </body>
 </html>
+
 
 
 
