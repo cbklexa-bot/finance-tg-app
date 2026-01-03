@@ -943,20 +943,31 @@ async function askAI() {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 prompt: q,
-                history: db.slice(0, 200) // ⬅️ ПЕРЕДАЁМ МАССИВ, НЕ ТЕКСТ
+                history: db.slice(0, 300) // ВСЕГДА массив
             })
         });
 
-        const raw = await response.json();
-        const content = raw?.choices?.[0]?.message?.content || '';
-        const jsonMatch = content.match(/\{[\s\S]*\}/);
+        if (!response.ok) {
+            throw new Error('HTTP ' + response.status);
+        }
 
-        if (!jsonMatch) {
-            document.getElementById(tempId).innerText = content || 'Нет ответа';
+        const raw = await response.json();
+        const content = raw?.choices?.[0]?.message?.content;
+
+        if (!content) {
+            document.getElementById(tempId).innerText =
+                '⚠️ AI не вернул ответ. Попробуй переформулировать запрос.';
             return;
         }
 
-        const ai = JSON.parse(jsonMatch[0]);
+        let ai;
+        try {
+            ai = JSON.parse(content);
+        } catch {
+            // Если AI ответил обычным текстом
+            document.getElementById(tempId).innerText = content;
+            return;
+        }
 
         /* ===== НОРМАЛИЗАЦИЯ КАТЕГОРИЙ ===== */
         const catAliases = {
@@ -984,7 +995,7 @@ async function askAI() {
             прочее:"📦"
         };
 
-        /* ===== АВТОЗАПИСЬ ===== */
+        /* ===== ДОБАВЛЕНИЕ ТРАНЗАКЦИИ ===== */
         if (ai.action === 'add') {
             const catKey = resolveCategory(ai.category);
             const entry = {
@@ -995,6 +1006,12 @@ async function askAI() {
                 n: ai.note || '',
                 d: new Date().toISOString().split('T')[0]
             };
+
+            if (entry.s <= 0) {
+                document.getElementById(tempId).innerText =
+                    '⚠️ Не смог определить сумму. Напиши иначе.';
+                return;
+            }
 
             db.unshift(entry);
             updateUI();
@@ -1008,17 +1025,18 @@ async function askAI() {
         }
 
         /* ===== АНАЛИЗ / ЧАТ ===== */
-        if (ai.action === 'chat') {
-            document.getElementById(tempId).innerText = ai.text;
-        }
+        document.getElementById(tempId).innerText =
+            ai.text || content || '🤖 Я здесь. Спроси иначе.';
 
     } catch (e) {
         console.error(e);
-        document.getElementById(tempId).innerText = '❌ Ошибка связи с AI';
+        document.getElementById(tempId).innerText =
+            '❌ Ошибка связи с AI. Попробуй позже.';
     }
 
     chat.scrollTop = chat.scrollHeight;
-}      
+}
+      
         
         window.quickAdd = async (t, c, s, n) => { db.unshift({ id: Date.now(), t, c, s, n, d: new Date().toISOString().split('T')[0] }); updateUI(); await cloudSave(); go('home'); };
 
@@ -1154,6 +1172,7 @@ async function editGoalName() {
     </script>
 </body>
 </html>
+
 
 
 
