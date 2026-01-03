@@ -14,31 +14,34 @@ export async function onRequestPost({ request, env }) {
         },
         body: JSON.stringify({
           model: "google/gemini-2.0-flash-001",
+          temperature: 0.2,
           messages: [
             {
               role: "system",
               content: `
 Ты — ЛИЧНЫЙ ФИНАНСОВЫЙ АССИСТЕНТ пользователя.
 
-У тебя есть доступ к его ИСТОРИИ ТРАНЗАКЦИЙ (history).
+У тебя есть ИСТОРИЯ ТРАНЗАКЦИЙ (history).
 
 ФОРМАТ history:
-- history — массив объектов
-- t: "exp" (расход) или "inc" (доход)
+- массив объектов
+- t: "exp" | "inc"
 - c: категория (эмодзи)
 - s: сумма (число)
 - n: описание
-- d: дата в формате YYYY-MM-DD
+- d: дата YYYY-MM-DD
 
-ОЧЕНЬ ВАЖНО:
-- Если пользователь просит АНАЛИЗ, ИТОГИ, СОВЕТЫ, ПЕРИОД —
-  СТРОГО возвращай:
-  {"action":"chat","text":"ответ"}
+СТРОГИЕ ПРАВИЛА:
 
-- ЗАПРЕЩЕНО добавлять транзакции при анализе.
+1. Если пользователь ПРОСИТ АНАЛИЗ, ИТОГИ, СОВЕТЫ, ПЕРИОД:
+   ВСЕГДА возвращай:
+   {"action":"chat","text":"ответ"}
 
-Добавление транзакции РАЗРЕШЕНО ТОЛЬКО если пользователь явно описывает факт:
-"заправил авто на 500", "зарплата 120000", "купил продукты 2300"
+2. ЗАПРЕЩЕНО добавлять транзакции при анализе.
+
+3. Добавление транзакции ТОЛЬКО если пользователь
+   явно описывает факт:
+   "заправил авто на 500", "зарплата 120000"
 
 Тогда вернуть ТОЛЬКО JSON:
 {
@@ -49,18 +52,23 @@ export async function onRequestPost({ request, env }) {
   "note": "краткое описание"
 }
 
-Ты ОБЯЗАН:
-- использовать history для анализа
-- считать суммы
-- фильтровать по датам (день, неделя, месяц)
-- находить проблемные категории
-- давать конкретные советы по оптимизации бюджета
+4. ЗАПРЕЩЕНО:
+- возвращать пустой ответ
+- возвращать текст без JSON
+- смешивать текст и JSON
+
+ЕСЛИ не добавляешь транзакцию —
+ОБЯЗАН вернуть:
+{"action":"chat","text":"ответ"}
 `
             },
-            { role: "user", content: prompt },
             {
-              role: "assistant",
+              role: "system",
               content: `История транзакций пользователя:\n${JSON.stringify(history)}`
+            },
+            {
+              role: "user",
+              content: prompt
             }
           ]
         })
@@ -68,17 +76,29 @@ export async function onRequestPost({ request, env }) {
     );
 
     const data = await response.json();
+
     return new Response(JSON.stringify(data), {
       headers: { "Content-Type": "application/json" }
     });
 
   } catch (e) {
     return new Response(
-      JSON.stringify({ error: e.message }),
-      { status: 500 }
+      JSON.stringify({
+        choices: [{
+          message: {
+            content: JSON.stringify({
+              action: "chat",
+              text: "Произошла внутренняя ошибка AI. Попробуй позже."
+            })
+          }
+        }]
+      }),
+      { status: 200, headers: { "Content-Type": "application/json" } }
     );
   }
 }
+
+
 
 
 
