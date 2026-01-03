@@ -142,6 +142,38 @@
         .n-item svg { width: 22px; height: 22px; display: block; margin: 0 auto 4px; stroke: currentColor; fill: none; stroke-width: 2.5; }
 
         @keyframes slideUp { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+.goal-card {
+    background: var(--card);
+    border-radius: 22px;
+    padding: 16px;
+    border: 1px solid var(--border);
+    margin-bottom: 12px;
+}
+
+.goal-title {
+    font-weight: 900;
+    font-size: 15px;
+}
+
+.goal-progress {
+    font-size: 12px;
+    color: var(--text);
+    margin: 6px 0;
+}
+
+.goal-bar {
+    height: 8px;
+    background: var(--btn-bg);
+    border-radius: 10px;
+    overflow: hidden;
+}
+
+.goal-fill {
+    height: 100%;
+    background: var(--green);
+    transition: 0.4s;
+}
+
     </style>
 </head>
 <body>
@@ -238,6 +270,7 @@
             <div id="tab-tasks" class="tab-btn" onclick="switchNoteTab('tasks')">✅ Список дел</div>
             <div id="tab-habits" class="tab-btn" onclick="switchNoteTab('habits')">🔄 Привычки</div>
             <div id="tab-notes" class="tab-btn" onclick="switchNoteTab('notes')">📝 Дневник</div>
+            <div id="tab-goals" class="tab-btn" onclick="switchNoteTab('goals')">🎯 Цели</div>
         </div>
 
         <div id="view-cal" class="note-view active">
@@ -268,6 +301,16 @@
             <button class="save-btn" style="width:100%; margin-bottom:15px;" onclick="openNoteModal()">+ Создать заметку</button>
             <div id="note-list"></div>
         </div>
+
+        <div id="view-goals" class="note-view">
+    <div class="input-section">
+        <input type="text" id="goal-title" class="note-in" placeholder="Название цели..." style="text-align:left;">
+        <input type="number" id="goal-amount" class="note-in" placeholder="Сумма цели">
+        <button class="save-btn" onclick="addGoal()">Добавить цель</button>
+    </div>
+    <div id="goal-list"></div>
+</div>
+
     </div>
 
     <div id="p-ai" class="page">
@@ -485,7 +528,7 @@
 
         // --- Сохранение и Синхронизация Блокнота ---
         async function cloudSaveNotebook() {
-            const notebookData = { tasks, habits, notes };
+            const notebookData = { tasks, habits, notes, goals };
             const { error } = await _supabase.from('notebook').upsert({ id: userId, data: notebookData, updated_at: new Date() }, { onConflict: 'id' });
         }
 
@@ -493,6 +536,7 @@
             localStorage.setItem('fin_tasks_' + userId, JSON.stringify(tasks));
             localStorage.setItem('fin_habits_' + userId, JSON.stringify(habits));
             localStorage.setItem('fin_notes_' + userId, JSON.stringify(notes));
+            localStorage.setItem('fin_goals_' + userId, JSON.stringify(goals));
             cloudSaveNotebook();
         }
 
@@ -500,9 +544,11 @@
             const t = localStorage.getItem('fin_tasks_' + userId);
             const h = localStorage.getItem('fin_habits_' + userId);
             const n = localStorage.getItem('fin_notes_' + userId);
+            const g = localStorage.getItem('fin_goals_' + userId);
             if(t) tasks = JSON.parse(t);
             if(h) habits = JSON.parse(h);
             if(n) notes = JSON.parse(n);
+            if (g) goals = JSON.parse(g);
             renderTasks(); renderHabits(); renderNotes();
         }
 
@@ -513,11 +559,46 @@
                     tasks = data.data.tasks || [];
                     habits = data.data.habits || [];
                     notes = data.data.notes || [];
+                    goals = data.data.goals || [];
                     saveNotebook(); // обновит локалсторадж
-                    renderTasks(); renderHabits(); renderNotes();
+                    renderTasks(); renderHabits(); renderNotes(); renderGoals();
                 }
             } catch (e) {}
         }
+        function addGoal() {
+    const title = document.getElementById('goal-title').value;
+    const amount = Number(document.getElementById('goal-amount').value);
+    if (!title || !amount) return;
+
+    goals.push({
+        id: Date.now(),
+        title,
+        amount,
+        saved: 0,
+        created: new Date().toISOString()
+    });
+
+    document.getElementById('goal-title').value = '';
+    document.getElementById('goal-amount').value = '';
+
+    saveNotebook();
+    renderGoals();
+}
+
+function renderGoals() {
+    document.getElementById('goal-list').innerHTML = goals.map(g => {
+        const perc = Math.min((g.saved / g.amount) * 100, 100);
+        return `
+        <div class="goal-card">
+            <div class="goal-title">${g.title}</div>
+            <div class="goal-progress">${g.saved.toLocaleString()} / ${g.amount.toLocaleString()} ₽ (${Math.round(perc)}%)</div>
+            <div class="goal-bar">
+                <div class="goal-fill" style="width:${perc}%"></div>
+            </div>
+        </div>`;
+    }).join('');
+}
+
 
         // === СТАРЫЙ ФУНКЦИОНАЛ ===
         const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -846,11 +927,12 @@ async function askAI() {
             syncFromCloud(); 
             loadNotebook(); // Загрузка блокнота локально
             syncNotebookFromCloud(); // Загрузка блокнота из облака
-            getRates(); 
+            getRates();renderGoals(); 
         };
     </script>
 </body>
 </html>
+
 
 
 
