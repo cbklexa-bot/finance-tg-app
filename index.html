@@ -1253,13 +1253,7 @@ async function syncNotebookFromCloud() {
             balLabel.style.color = "var(--blue)";
             balLabel.style.fontSize = "20px";
         }
-    }, 1000); // Подождем секунду, чтобы интерфейс загрузился
-
-    // Дальше твой обычный код...
-    document.getElementById('date-picker').value = new Date().toISOString().split('T')[0];
-    tg.expand();
-    // ... и так далее
-};
+    }, 1000);
     // Установка дат
     document.getElementById('date-picker').value = new Date().toISOString().split('T')[0];
     document.getElementById('task-date').value = new Date().toISOString().split('T')[0];
@@ -1340,6 +1334,7 @@ async function editGoalName() {
     </script>
 </body>
 </html>
+
 
 
 
