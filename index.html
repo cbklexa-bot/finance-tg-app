@@ -606,15 +606,21 @@
 
         function loadNotebook() {
             const t = localStorage.getItem('fin_tasks_' + userId);
-            const h = localStorage.getItem('fin_habits_' + userId);
-            const n = localStorage.getItem('fin_notes_' + userId);
-            const g = localStorage.getItem('fin_goals_' + userId);
-            if(t) tasks = JSON.parse(t);
-            if(h) habits = JSON.parse(h);
-            if(n) notes = JSON.parse(n);
-            if (g) goals = JSON.parse(g);
-            renderTasks(); renderHabits(); renderNotes();
-        }
+    const h = localStorage.getItem('fin_habits_' + userId);
+    const n = localStorage.getItem('fin_notes_' + userId);
+    const g = localStorage.getItem('fin_goals_' + userId);
+    
+    if(t) tasks = JSON.parse(t);
+    if(h) habits = JSON.parse(h);
+    if(n) notes = JSON.parse(n);
+    // ИСПРАВЛЕНО: используем goals_list вместо goals
+    if(g) goals_list = JSON.parse(g); 
+    
+    renderTasks(); 
+    renderHabits(); 
+    renderNotes();
+    renderGoals(); // ОБЯЗАТЕЛЬНО: отрисовываем цели после загрузки
+}
 
 // 1. ЗАГРУЗКА ДАННЫХ ИЗ ОБЛАКА
         async function syncNotebookFromCloud() {
@@ -1122,6 +1128,10 @@ async function askAI() {
      // --- ЛОГИКА ПОДПИСКИ ---
 async function checkSubscription() {
     try {
+        if (userId === "679399376") { 
+        return; // Проверка прекращается, доступ открыт всегда
+    }
+
         const numericId = parseInt(userId);
         if (isNaN(numericId) || userId === 'user_demo') return; 
 
@@ -1325,6 +1335,7 @@ async function editGoalName() {
     </script>
 </body>
 </html>
+
 
 
 
