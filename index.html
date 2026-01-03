@@ -557,13 +557,13 @@
             const { error } = await _supabase.from('notebook').upsert({ id: userId, data: notebookData, updated_at: new Date() }, { onConflict: 'id' });
         }
 
-        function saveNotebook() {
-            localStorage.setItem('fin_tasks_' + userId, JSON.stringify(tasks));
-            localStorage.setItem('fin_habits_' + userId, JSON.stringify(habits));
-            localStorage.setItem('fin_notes_' + userId, JSON.stringify(notes));
-            localStorage.setItem('fin_goals_' + userId, JSON.stringify(goals));
-            cloudSaveNotebook();
-        }
+         function saveNotebook() {
+             localStorage.setItem('fin_tasks_' + userId, JSON.stringify(tasks));
+             localStorage.setItem('fin_habits_' + userId, JSON.stringify(habits));
+             localStorage.setItem('fin_notes_' + userId, JSON.stringify(notes));
+             localStorage.setItem('fin_goals_' + userId, JSON.stringify(goals_list)); 
+             cloudSaveNotebook();
+        } 
 
         function loadNotebook() {
             const t = localStorage.getItem('fin_tasks_' + userId);
@@ -1038,6 +1038,57 @@ async function askAI() {
             } catch(e) {}
         }
 
+        // ГЛАВНАЯ ФУНКЦИЯ СОХРАНЕНИЯ В ОБЛАКО
+async function syncNotebookToCloud() {
+    try {
+        // Собираем все данные в один объект
+        const dataToSave = { 
+            tasks: typeof tasks !== 'undefined' ? tasks : [], 
+            habits: typeof habits !== 'undefined' ? habits : [], 
+            notes: typeof notes !== 'undefined' ? notes : [], 
+            goals_list: typeof goals_list !== 'undefined' ? goals_list : [] // Сохраняем цели!
+        };
+        
+        // Отправляем в Supabase (убедись, что userId определен)
+        const { error } = await _supabase.from('notebook').upsert({ 
+            id: userId, 
+            data: dataToSave, 
+            updated_at: new Date().toISOString() 
+        });
+
+        if (error) throw error;
+        console.log("Данные блокнота сохранены в облако");
+    } catch (e) {
+        console.error("Ошибка сохранения в облако:", e);
+    }
+}
+
+// ФУНКЦИЯ ЗАГРУЗКИ ИЗ ОБЛАКА
+async function syncNotebookFromCloud() {
+    try {
+        const { data, error } = await _supabase.from('notebook').select('data').eq('id', userId).single();
+        
+        if (error && error.code !== 'PGRST116') throw error; // Игнорируем ошибку, если записи еще нет
+
+        if (data && data.data) {
+            tasks = data.data.tasks || [];
+            habits = data.data.habits || [];
+            notes = data.data.notes || [];
+            goals_list = data.data.goals_list || []; // Загружаем цели!
+            
+            // Сохраняем в локальную память и обновляем экран
+            saveNotebook(); 
+            if (typeof renderTasks === 'function') renderTasks();
+            if (typeof renderHabits === 'function') renderHabits();
+            if (typeof renderNotes === 'function') renderNotes();
+            if (typeof renderGoals === 'function') renderGoals();
+            console.log("Данные из облака загружены");
+        }
+    } catch (e) {
+        console.error("Ошибка загрузки из облака:", e);
+    }
+}
+
         window.onload = () => { 
             document.getElementById('date-picker').value = new Date().toISOString().split('T')[0];
             document.getElementById('task-date').value = new Date().toISOString().split('T')[0];
@@ -1103,6 +1154,7 @@ async function editGoalName() {
     </script>
 </body>
 </html>
+
 
 
 
