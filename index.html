@@ -174,9 +174,48 @@
     transition: 0.4s;
 }
 
+/* Окно подписки (Paywall) */
+#paywall-modal {
+    display: none; 
+    position: fixed; 
+    top: 0; left: 0; width: 100%; height: 100%; 
+    background: rgba(0,0,0,0.95); 
+    z-index: 9999; 
+    flex-direction: column; 
+    align-items: center; 
+    justify-content: center; 
+    padding: 20px; 
+    text-align: center; 
+    backdrop-filter: blur(10px);
+}
+.premium-icon { font-size: 60px; margin-bottom: 20px; }
+.pay-card {
+    background: var(--card); 
+    border: 1px solid var(--blue); 
+    border-radius: 16px; 
+    padding: 20px; 
+    width: 100%; 
+    max-width: 300px; 
+    margin-bottom: 30px;
+}
+
     </style>
 </head>
 <body>
+    <div id="paywall-modal">
+    <div class="premium-icon">🧠</div>
+    <h2 style="color:var(--main); margin-bottom:10px;">НейроСчет Premium</h2>
+    <p style="color:var(--text); font-size:14px; margin-bottom:30px; line-height:1.5;">
+        Твой пробный период истек.<br>Оформи доступ, чтобы продолжить.
+    </p>
+    <div class="pay-card">
+        <div style="color:var(--text); font-size:12px; text-transform:uppercase;">Месячная подписка</div>
+        <div style="font-size:32px; font-weight:800; color:var(--main); margin:10px 0;">199 ₽</div>
+        <div style="color:var(--green); font-size:13px; font-weight:bold;">Первые 7 дней бесплатно!</div>
+    </div>
+    <button onclick="buySubscription()" class="save-btn" style="max-width:300px;">Активировать доступ</button>
+    <div id="pay-status" style="margin-top:15px; color:var(--text); font-size:12px;"></div>
+</div>
 
     <div id="edit-modal"><div class="modal-content">
         <h3 style="text-align:center;">Редактировать</h3>
@@ -1080,7 +1119,65 @@ async function askAI() {
         
         window.quickAdd = async (t, c, s, n) => { db.unshift({ id: Date.now(), t, c, s, n, d: new Date().toISOString().split('T')[0] }); updateUI(); await cloudSave(); go('home'); };
 
-        function setMode(m) { mode = m; currentCat = cats[m][0].i; renderCats(); document.getElementById('btn-exp').style.background = m === 'exp' ? 'var(--blue)' : 'transparent'; document.getElementById('btn-inc').style.background = m === 'inc' ? 'var(--blue)' : 'transparent'; }
+     // --- ЛОГИКА ПОДПИСКИ ---
+async function checkSubscription() {
+    try {
+        const numericId = parseInt(userId);
+        if (isNaN(numericId) || userId === 'user_demo') return; 
+
+        // Запрос к Supabase
+        let { data, error } = await _supabase.from('subscriptions').select('*').eq('user_id', numericId).single();
+        const now = new Date();
+
+        if (!data) {
+            // Если пользователя нет, создаем пробный период на 7 дней
+            const trialEnd = new Date();
+            trialEnd.setDate(trialEnd.getDate() + 7);
+            await _supabase.from('subscriptions').insert({ 
+                user_id: numericId, 
+                is_trial_used: true, 
+                expires_at: trialEnd.toISOString() 
+            });
+            return;
+        }
+
+        // Проверка даты истечения
+        const expireDate = new Date(data.expires_at);
+        if (now > expireDate) {
+            document.getElementById('paywall-modal').style.display = 'flex';
+        }
+    } catch (e) {
+        console.error("Ошибка подписки:", e);
+    }
+}
+
+async function buySubscription() {
+    const status = document.getElementById('pay-status');
+    status.innerText = "Обработка платежа...";
+    
+    const numericId = parseInt(userId);
+    
+    // Имитация оплаты (через 1.5 сек продлеваем в базе)
+    setTimeout(async () => {
+        const newDate = new Date();
+        newDate.setDate(newDate.getDate() + 30); // Продлеваем на 30 дней
+        
+        const { error } = await _supabase.from('subscriptions').upsert({ 
+            user_id: numericId, 
+            expires_at: newDate.toISOString(),
+            is_trial_used: true 
+        });
+
+        if (!error) {
+            document.getElementById('paywall-modal').style.display = 'none';
+            alert("Поздравляем! Доступ продлен на 30 дней.");
+        } else {
+            status.innerText = "Ошибка при обновлении. Попробуйте позже.";
+        }
+    }, 1500);
+}   
+
+function setMode(m) { mode = m; currentCat = cats[m][0].i; renderCats(); document.getElementById('btn-exp').style.background = m === 'exp' ? 'var(--blue)' : 'transparent'; document.getElementById('btn-inc').style.background = m === 'inc' ? 'var(--blue)' : 'transparent'; }
         function toggleBlur() { document.getElementById('bal').classList.toggle('blurred'); tg.HapticFeedback.impactOccurred('light'); }
         function openEdit(id) { editingId = id; const item = db.find(x => x.id === id); document.getElementById('edit-sum').value = item.s; document.getElementById('edit-note').value = item.n; document.getElementById('edit-modal').style.display = 'flex'; }
         function closeModal() { document.getElementById('edit-modal').style.display = 'none'; }
@@ -1147,15 +1244,32 @@ async function syncNotebookFromCloud() {
     }
 }
 
-        window.onload = () => { 
-            document.getElementById('date-picker').value = new Date().toISOString().split('T')[0];
-            document.getElementById('task-date').value = new Date().toISOString().split('T')[0];
-            tg.expand(); 
-            syncFromCloud(); 
-            loadNotebook(); // Загрузка блокнота локально
-            syncNotebookFromCloud(); // Загрузка блокнота из облака
-            getRates();renderGoals(); 
-        };
+       window.onload = async () => { 
+    // Установка дат
+    document.getElementById('date-picker').value = new Date().toISOString().split('T')[0];
+    document.getElementById('task-date').value = new Date().toISOString().split('T')[0];
+    
+    // Инициализация Telegram
+    if (window.tg) {
+        tg.expand();
+        tg.ready();
+        alert("Мой ID: " + userId)
+    }
+
+    // 1. ПРОВЕРКА ПОДПИСКИ (важно сделать до отрисовки интерфейса)
+    await checkSubscription();
+
+    // 2. ЗАГРУЗКА ДАННЫХ
+    await syncFromCloud(); 
+    loadNotebook(); 
+    await syncNotebookFromCloud(); 
+
+    // 3. ОТРИСОВКА ИНТЕРФЕЙСА
+    getRates();
+    setMode('exp'); // Отрисовываем категории на главной
+    renderGoals(); 
+    go('home'); // Открываем главную страницу
+};
 
 // Открыть модальное окно управления целью
 function openGoalAction(id) {
