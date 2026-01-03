@@ -989,13 +989,27 @@ async function askAI() {
     подарок: ["подар","перевод","дали","получил"]
 };
 
-        function resolveCategory(cat = "") {
-            cat = cat.toLowerCase();
-            for (const [key, arr] of Object.entries(catAliases)) {
-                if (arr.some(w => cat.includes(w))) return key;
-            }
-            return "прочее";
+       function resolveCategory(cat = "") {
+    if (!cat) return "прочее";
+
+    cat = cat.toLowerCase().trim();
+
+    // ✅ 1. ЕСЛИ AI УЖЕ ВЕРНУЛ НОРМАЛЬНУЮ КАТЕГОРИЮ — БЕРЁМ ЕЁ
+    if (iconMap[cat]) {
+        return cat;
+    }
+
+    // ✅ 2. ИНАЧЕ ПЫТАЕМСЯ ОПРЕДЕЛИТЬ ПО СЛОВАМ
+    for (const [key, arr] of Object.entries(catAliases)) {
+        if (arr.some(w => cat.includes(w))) {
+            return key;
         }
+    }
+
+    // ✅ 3. ФОЛБЭК
+    return "прочее";
+}
+
 
                  const iconMap = {
                       // Расходы
@@ -1198,6 +1212,7 @@ async function editGoalName() {
     </script>
 </body>
 </html>
+
 
 
 
