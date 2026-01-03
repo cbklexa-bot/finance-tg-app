@@ -204,6 +204,26 @@
         <button class="note-in" style="margin-top:10px; background:none;" onclick="document.getElementById('note-modal').style.display='none'">Закрыть</button>
     </div></div>
 
+     <div id="goal-action-modal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.85); z-index:10000; align-items:center; justify-content:center; backdrop-filter: blur(5px);">
+        <div class="modal-content" style="width:90%; max-width:350px;">
+            <h3 id="modal-goal-title" style="text-align:center; margin-bottom:20px; color:var(--main);">Цель</h3>
+            
+            <div style="margin-bottom:20px;">
+                <label style="font-size:12px; color:var(--text);">Внести деньги в копилку:</label>
+                <input type="number" id="add-goal-money" class="note-in" placeholder="Сумма (₽)" style="margin-top:10px; width:100%; background:var(--btn-bg); border:1px solid var(--border); color:white; padding:10px; border-radius:10px;">
+            </div>
+            
+            <button class="save-btn" onclick="addMoneyToGoal()" style="background:var(--green); color:white; font-weight:bold; margin-bottom:10px;">+ Пополнить</button>
+            
+            <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px;">
+                <button class="save-btn" onclick="editGoalName()" style="background:var(--btn-bg); font-size:13px;">Изменить</button>
+                <button class="save-btn" onclick="deleteGoalReal()" style="background:var(--red); color:white; font-size:13px;">Удалить</button>
+            </div>
+            
+            <button class="note-in" style="margin-top:20px; background:none; border:none; color:var(--text);" onclick="closeGoalActionModal()">Отмена</button>
+        </div>
+    </div>
+
     <div id="p-home" class="page active">
         <div class="compact-header">
             <div class="ticker-group">
@@ -342,11 +362,16 @@
         const { createClient } = supabase;
         const _supabase = createClient('https://ereiiidezagburttpxtn.supabase.co', 'sb_publishable_YuQ8s49c1LvkCTmoBPQ0hA_7EJ3Z1cj');
         
-        let userId = tg.initDataUnsafe?.user?.id?.toString() || 'user_demo';
+       let userId = tg.initDataUnsafe?.user?.id?.toString() || 'user_demo';
         let db = [];
         let budgets = JSON.parse(localStorage.getItem('fin_budgets_' + userId)) || [];
-        // === ПЕРЕМЕННЫЕ БЛОКНОТА ===
-        let tasks = [], habits = [], notes = [];
+
+        // === ПЕРЕМЕННЫЕ БЛОКНОТА (ОБНОВЛЕНО) ===
+        let tasks = [];
+        let habits = [];
+        let notes = [];
+        let goals_list = []; // Массив для хранения ваших целей
+        let selectedGoalId = null; // ID цели, которую вы нажали (для пополнения/удаления)
         let editingNoteId = null;
 
         let mode = 'exp', currentCat = '🛒', currentSlide = 0, touchStartX = 0, editingBudIdx = null, editingId = null;
@@ -552,6 +577,7 @@
             renderTasks(); renderHabits(); renderNotes();
         }
 
+// 1. ЗАГРУЗКА ДАННЫХ ИЗ ОБЛАКА
         async function syncNotebookFromCloud() {
             try {
                 const { data } = await _supabase.from('notebook').select('data').eq('id', userId).single();
@@ -559,46 +585,138 @@
                     tasks = data.data.tasks || [];
                     habits = data.data.habits || [];
                     notes = data.data.notes || [];
-                    goals = data.data.goals || [];
-                    saveNotebook(); // обновит локалсторадж
+                    goals_list = data.data.goals_list || []; 
+                    saveNotebook();
                     renderTasks(); renderHabits(); renderNotes(); renderGoals();
                 }
-            } catch (e) {}
+            } catch (e) { console.error("Ошибка загрузки:", e); }
         }
-        function addGoal() {
-    const title = document.getElementById('goal-title').value;
-    const amount = Number(document.getElementById('goal-amount').value);
-    if (!title || !amount) return;
 
-    goals.push({
-        id: Date.now(),
-        title,
-        amount,
-        saved: 0,
-        created: new Date().toISOString()
-    });
+        // 2. ФУНКЦИЯ СОЗДАНИЯ ЦЕЛИ
+        async function addGoal() {
+            const titleIn = document.getElementById('goal-title');
+            const amountIn = document.getElementById('goal-amount');
+            const title = titleIn.value.trim();
+            const amount = parseFloat(amountIn.value);
 
-    document.getElementById('goal-title').value = '';
-    document.getElementById('goal-amount').value = '';
+            if (!title || isNaN(amount) || amount <= 0) {
+                alert("Укажите название и сумму цели");
+                return;
+            }
 
-    saveNotebook();
-    renderGoals();
-}
+            const newGoal = {
+                id: Date.now().toString(),
+                title: title,
+                target: amount,
+                current: 0
+            };
 
-function renderGoals() {
-    document.getElementById('goal-list').innerHTML = goals.map(g => {
-        const perc = Math.min((g.saved / g.amount) * 100, 100);
-        return `
-        <div class="goal-card">
-            <div class="goal-title">${g.title}</div>
-            <div class="goal-progress">${g.saved.toLocaleString()} / ${g.amount.toLocaleString()} ₽ (${Math.round(perc)}%)</div>
-            <div class="goal-bar">
-                <div class="goal-fill" style="width:${perc}%"></div>
-            </div>
-        </div>`;
-    }).join('');
-}
+            goals_list.push(newGoal);
+            titleIn.value = '';
+            amountIn.value = '';
 
+            renderGoals();
+            await syncNotebookToCloud();
+            tg.HapticFeedback.notificationOccurred('success');
+        }
+
+        // 3. ОТРИСОВКА СПИСКА ЦЕЛЕЙ (ИСПРАВЛЕННАЯ ВЕРСИЯ)
+        function renderGoals() {
+            const list = document.getElementById('goal-list');
+            if (!list) return;
+            list.innerHTML = ''; // Очищаем список перед отрисовкой
+
+            if (!goals_list || goals_list.length === 0) {
+                list.innerHTML = '<div style="text-align:center; color:var(--text); padding:20px; font-size:12px;">Нет активных целей</div>';
+                return;
+            }
+
+            goals_list.forEach(g => {
+                const perc = Math.min(Math.round((g.current / g.target) * 100), 100);
+                const item = document.createElement('div');
+                
+                // Настраиваем внешний вид карточки
+                item.className = 'bento-item wide';
+                item.style.marginBottom = '12px';
+                item.style.cursor = 'pointer';
+                item.style.display = 'block'; // Гарантируем видимость
+                
+                // ПРИВЯЗЫВАЕМ КЛИК НАПРЯМУЮ
+                item.onclick = function() {
+                    openGoalAction(g.id);
+                };
+
+                item.innerHTML = `
+                    <div style="display:flex; justify-content:space-between; align-items:center; pointer-events:none;">
+                        <span style="font-weight:800; font-size:14px; color:var(--main);">${g.title}</span>
+                        <span style="color:var(--green); font-weight:800; font-size:12px;">${g.current.toLocaleString()} / ${g.target.toLocaleString()} ₽</span>
+                    </div>
+                    <div style="background:var(--btn-bg); height:8px; border-radius:4px; margin:10px 0; overflow:hidden; pointer-events:none;">
+                        <div style="width:${perc}%; height:100%; background:var(--green); transition:0.3s;"></div>
+                    </div>
+                    <div style="display:flex; justify-content:space-between; font-size:10px; color:var(--text); pointer-events:none;">
+                        <span>Выполнено: ${perc}%</span>
+                        <span>Осталось: ${(g.target - g.current).toLocaleString()} ₽</span>
+                    </div>
+                `;
+                list.appendChild(item);
+            });
+        }
+
+        // 4. ФУНКЦИИ УПРАВЛЕНИЯ (МЕНЮ)
+        function openGoalAction(id) {
+            selectedGoalId = id.toString();
+            const goal = goals_list.find(g => g.id === selectedGoalId);
+            if (goal) {
+                // Заполняем заголовок в модалке
+                const modalTitle = document.getElementById('modal-goal-title');
+                if(modalTitle) modalTitle.innerText = goal.title;
+                
+                // Показываем модалку
+                const modal = document.getElementById('goal-action-modal');
+                if(modal) modal.style.display = 'flex';
+            }
+        }
+
+        async function addMoneyToGoal() {
+            const amountInput = document.getElementById('add-goal-money');
+            const amount = parseFloat(amountInput.value);
+            if (isNaN(amount) || amount <= 0) return;
+
+            const goal = goals_list.find(g => g.id === selectedGoalId);
+            if (goal) {
+                goal.current += amount; // Плюсуем деньги
+                amountInput.value = '';
+                closeGoalActionModal();
+                renderGoals();
+                await syncNotebookToCloud();
+                tg.HapticFeedback.notificationOccurred('success');
+            }
+        }
+
+        async function editGoalName() {
+            const goal = goals_list.find(g => g.id === selectedGoalId);
+            if (!goal) return;
+            const newName = prompt("Новое название цели:", goal.title);
+            if (newName && newName.trim() !== "") {
+                goal.title = newName;
+                renderGoals();
+                await syncNotebookToCloud();
+            }
+        }
+
+        async function deleteGoalReal() {
+            if (!confirm("Удалить эту цель?")) return;
+            goals_list = goals_list.filter(g => g.id !== selectedGoalId);
+            closeGoalActionModal();
+            renderGoals();
+            await syncNotebookToCloud();
+        }
+
+        function closeGoalActionModal() {
+            const modal = document.getElementById('goal-action-modal');
+            if(modal) modal.style.display = 'none';
+        }
 
         // === СТАРЫЙ ФУНКЦИОНАЛ ===
         const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -929,9 +1047,63 @@ async function askAI() {
             syncNotebookFromCloud(); // Загрузка блокнота из облака
             getRates();renderGoals(); 
         };
+
+// Открыть модальное окно управления целью
+function openGoalAction(id) {
+    selectedGoalId = id.toString();
+    const goal = goals_list.find(g => g.id === selectedGoalId);
+    if (goal) {
+        document.getElementById('modal-goal-title').innerText = goal.title;
+        document.getElementById('goal-action-modal').style.display = 'flex';
+        if(window.tg) tg.HapticFeedback.impactOccurred('medium');
+    }
+}
+
+// Закрыть окно
+function closeGoalActionModal() {
+    document.getElementById('goal-action-modal').style.display = 'none';
+    document.getElementById('add-goal-money').value = '';
+}
+
+// Внести деньги
+async function addMoneyToGoal() {
+    const input = document.getElementById('add-goal-money');
+    const val = parseFloat(input.value);
+    if (!val || val <= 0) return;
+
+    const goal = goals_list.find(g => g.id === selectedGoalId);
+    if (goal) {
+        goal.current += val;
+        closeGoalActionModal();
+        renderGoals();
+        if (typeof syncNotebookToCloud === 'function') await syncNotebookToCloud();
+        if(window.tg) tg.HapticFeedback.notificationOccurred('success');
+    }
+}
+
+// Удалить цель
+async function deleteGoalReal() {
+    if (!confirm("Удалить эту цель?")) return;
+    goals_list = goals_list.filter(g => g.id !== selectedGoalId);
+    closeGoalActionModal();
+    renderGoals();
+    if (typeof syncNotebookToCloud === 'function') await syncNotebookToCloud();
+}
+
+// Редактировать название
+async function editGoalName() {
+    const goal = goals_list.find(g => g.id === selectedGoalId);
+    const newName = prompt("Новое название цели:", goal.title);
+    if (newName) {
+        goal.title = newName;
+        renderGoals();
+        if (typeof syncNotebookToCloud === 'function') await syncNotebookToCloud();
+    }
+}
     </script>
 </body>
 </html>
+
 
 
 
