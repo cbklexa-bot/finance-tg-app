@@ -592,23 +592,33 @@
 
         // --- Сохранение и Синхронизация Блокнота ---
         async function cloudSaveNotebook() {
-            const notebookData = { tasks, habits, notes, goals };
-            const { error } = await _supabase.from('notebook').upsert({ id: userId, data: notebookData, updated_at: new Date() }, { onConflict: 'id' });
-        }
+    const notebookData = { tasks, habits, notes, goals: goals_list };
+    try {
+        const { error } = await _supabase.from('notebook').upsert({ 
+            id: userId, 
+            data: notebookData, 
+            updated_at: new Date() 
+        }, { onConflict: 'id' });
+        
+        if (error) console.error("Ошибка Supabase:", error);
+    } catch (e) {
+        console.error("Ошибка сохранения в облако:", e);
+    }
+}
 
          function saveNotebook() {
-             localStorage.setItem('fin_tasks_' + userId, JSON.stringify(tasks));
-             localStorage.setItem('fin_habits_' + userId, JSON.stringify(habits));
-             localStorage.setItem('fin_notes_' + userId, JSON.stringify(notes));
-             localStorage.setItem('fin_goals_' + userId, JSON.stringify(goals_list)); 
-             cloudSaveNotebook();
-        } 
+    localStorage.setItem('fin_tasks_' + userId, JSON.stringify(tasks));
+    localStorage.setItem('fin_habits_' + userId, JSON.stringify(habits));
+    localStorage.setItem('fin_notes_' + userId, JSON.stringify(notes));
+    localStorage.setItem('fin_goals_' + userId, JSON.stringify(goals_list)); 
+    cloudSaveNotebook(); // вызываем сохранение в облако
+} 
 
         function loadNotebook() {
-            const t = localStorage.getItem('fin_tasks_' + userId);
-    const h = localStorage.getItem('fin_habits_' + userId);
-    const n = localStorage.getItem('fin_notes_' + userId);
-    const g = localStorage.getItem('fin_goals_' + userId);
+    tasks = JSON.parse(localStorage.getItem('fin_tasks_' + userId)) || [];
+    habits = JSON.parse(localStorage.getItem('fin_habits_' + userId)) || [];
+    notes = JSON.parse(localStorage.getItem('fin_notes_' + userId)) || [];
+    goals_list = JSON.parse(localStorage.getItem('fin_goals_' + userId)) || [];
     
     if(t) tasks = JSON.parse(t);
     if(h) habits = JSON.parse(h);
@@ -619,23 +629,26 @@
     renderTasks(); 
     renderHabits(); 
     renderNotes();
-    renderGoals(); // ОБЯЗАТЕЛЬНО: отрисовываем цели после загрузки
+    renderGoals(); // отрисовываем их на экране
 }
 
 // 1. ЗАГРУЗКА ДАННЫХ ИЗ ОБЛАКА
         async function syncNotebookFromCloud() {
-            try {
-                const { data } = await _supabase.from('notebook').select('data').eq('id', userId).single();
-                if (data && data.data) {
-                    tasks = data.data.tasks || [];
-                    habits = data.data.habits || [];
-                    notes = data.data.notes || [];
-                    goals_list = data.data.goals_list || []; 
-                    saveNotebook();
-                    renderTasks(); renderHabits(); renderNotes(); renderGoals();
-                }
-            } catch (e) { console.error("Ошибка загрузки:", e); }
+    try {
+        const { data } = await _supabase.from('notebook').select('data').eq('id', userId).single();
+        if (data && data.data) {
+            tasks = data.data.tasks || [];
+            habits = data.data.habits || [];
+            notes = data.data.notes || [];
+            goals_list = data.data.goals || []; 
+            
+            saveNotebook(); // 
+            renderTasks(); renderHabits(); renderNotes(); renderGoals();
         }
+    } catch (e) {
+        console.error("Ошибка синхронизации из облака:", e);
+    }
+}
 
         // 2. ФУНКЦИЯ СОЗДАНИЯ ЦЕЛИ
         async function addGoal() {
@@ -724,20 +737,19 @@
         }
 
         async function addMoneyToGoal() {
-            const amountInput = document.getElementById('add-goal-money');
-            const amount = parseFloat(amountInput.value);
-            if (isNaN(amount) || amount <= 0) return;
+    const input = document.getElementById('add-goal-money');
+    const val = parseFloat(input.value);
+    if (!val || val <= 0) return;
 
-            const goal = goals_list.find(g => g.id === selectedGoalId);
-            if (goal) {
-                goal.current += amount; // Плюсуем деньги
-                amountInput.value = '';
-                closeGoalActionModal();
-                renderGoals();
-                await syncNotebookToCloud();
-                tg.HapticFeedback.notificationOccurred('success');
-            }
-        }
+    const goal = goals_list.find(g => g.id === selectedGoalId);
+    if (goal) {
+        goal.current += val;
+        closeGoalActionModal();
+        renderGoals();
+        saveNotebook(); // <-- ПРОСТО ВЫЗОВИ ЭТУ ФУНКЦИЮ! Она сохранит и в телефон, и в облако.
+        if(window.tg) tg.HapticFeedback.notificationOccurred('success');
+    }
+}
 
         async function editGoalName() {
             const goal = goals_list.find(g => g.id === selectedGoalId);
@@ -751,12 +763,12 @@
         }
 
         async function deleteGoalReal() {
-            if (!confirm("Удалить эту цель?")) return;
-            goals_list = goals_list.filter(g => g.id !== selectedGoalId);
-            closeGoalActionModal();
-            renderGoals();
-            await syncNotebookToCloud();
-        }
+    if (!confirm("Удалить эту цель?")) return;
+    goals_list = goals_list.filter(g => g.id !== selectedGoalId);
+    closeGoalActionModal();
+    renderGoals();
+    saveNotebook(); // <-- И ЗДЕСЬ ТОЖЕ!
+}
 
         function closeGoalActionModal() {
             const modal = document.getElementById('goal-action-modal');
@@ -1127,37 +1139,37 @@ async function askAI() {
 
      // --- ЛОГИКА ПОДПИСКИ ---
 async function checkSubscription() {
+    // Вставь сюда свой ID, чтобы тебя никогда не блокировало
+    if (userId === "679399376") return; 
+
     try {
-        if (userId === "679399376") { 
-        return; // Проверка прекращается, доступ открыт всегда
-    }
-
         const numericId = parseInt(userId);
-        if (isNaN(numericId) || userId === 'user_demo') return; 
+        if (isNaN(numericId) || userId === 'user_demo') return;
 
-        // Запрос к Supabase
         let { data, error } = await _supabase.from('subscriptions').select('*').eq('user_id', numericId).single();
         const now = new Date();
 
+        // ЕСЛИ ПОЛЬЗОВАТЕЛЯ НЕТ В БАЗЕ (Первый вход)
         if (!data) {
-            // Если пользователя нет, создаем пробный период на 7 дней
             const trialEnd = new Date();
-            trialEnd.setDate(trialEnd.getDate() + 7);
+            trialEnd.setDate(trialEnd.getDate() + 7); // Добавляем 7 дней
+            
+            // Записываем нового пользователя в таблицу
             await _supabase.from('subscriptions').insert({ 
                 user_id: numericId, 
-                is_trial_used: true, 
                 expires_at: trialEnd.toISOString() 
             });
-            return;
+            console.log("Триал 7 дней активирован");
+            return; // Пускаем пользоваться
         }
 
-        // Проверка даты истечения
-        const expireDate = new Date(data.expires_at);
-        if (now > expireDate) {
+        // ЕСЛИ ПОЛЬЗОВАТЕЛЬ ЕСТЬ - ПРОВЕРЯЕМ ДАТУ
+        if (now > new Date(data.expires_at)) {
             document.getElementById('paywall-modal').style.display = 'flex';
+            if(window.tg) tg.HapticFeedback.notificationOccurred('error');
         }
-    } catch (e) {
-        console.error("Ошибка подписки:", e);
+    } catch (e) { 
+        console.error("Ошибка проверки подписки:", e); 
     }
 }
 
@@ -1308,7 +1320,7 @@ async function addMoneyToGoal() {
         goal.current += val;
         closeGoalActionModal();
         renderGoals();
-        if (typeof syncNotebookToCloud === 'function') await syncNotebookToCloud();
+        saveNotebook();
         if(window.tg) tg.HapticFeedback.notificationOccurred('success');
     }
 }
@@ -1335,6 +1347,7 @@ async function editGoalName() {
     </script>
 </body>
 </html>
+
 
 
 
