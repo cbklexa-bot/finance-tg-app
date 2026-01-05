@@ -1233,15 +1233,19 @@ async function askAI() {
             if(typeof getRates === 'function') getRates();
             if(typeof loadNotebook === 'function') loadNotebook();
             
-            // Проверяем подписку и грузим облако
-            await checkSubscription();
-            if(typeof syncFromCloud === 'function') syncFromCloud();
-            if(typeof syncNotebookFromCloud === 'function') syncNotebookFromCloud();
-            
+            // Загружаем данные из облака
+            if(typeof syncFromCloud === 'function') await syncFromCloud();
+            if(typeof syncNotebookFromCloud === 'function') await syncNotebookFromCloud();
+
+            // В ПОСЛЕДНЮЮ ОЧЕРЕДЬ проверяем подписку с задержкой, 
+            // чтобы навигация go('home') не перекрыла окно
+            setTimeout(async () => {
+                await checkSubscription();
+            }, 500); 
+
         } catch (e) {
             console.error("Фоновая ошибка:", e);
         }
-    };
 
 function setMode(m) { mode = m; currentCat = cats[m][0].i; renderCats(); document.getElementById('btn-exp').style.background = m === 'exp' ? 'var(--blue)' : 'transparent'; document.getElementById('btn-inc').style.background = m === 'inc' ? 'var(--blue)' : 'transparent'; }
         function toggleBlur() { document.getElementById('bal').classList.toggle('blurred'); tg.HapticFeedback.impactOccurred('light'); }
@@ -1391,6 +1395,7 @@ async function editGoalName() {
     </script>
 </body>
 </html>
+
 
 
 
