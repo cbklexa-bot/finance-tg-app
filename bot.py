@@ -7,29 +7,26 @@ from flask_cors import CORS
 from supabase import create_client, Client
 from datetime import datetime, timedelta
 
-# --- НАСТРОЙКА FLASK (ПРОКСИ И HEALTH CHECK) ---
-app = Flask(__name__)
-CORS(app)  # Разрешаем запросы от Mini App
-
-# Данные Supabase
-URL = os.environ.get('SUPABASE_URL') # Например: https://xyz.supabase.co
-KEY = os.environ.get('SUPABASE_KEY')
+# --- НАСТРОЙКИ ---
 TOKEN = os.environ.get('BOT_TOKEN')
+# Твои данные Supabase
+URL = "https://ereiiidezagburttpxtn.supabase.co"
+KEY = os.environ.get('SUPABASE_KEY') # Ключ лучше оставить в переменных Render
+
+app = Flask(__name__)
+CORS(app) # Разрешаем доступ из Mini App
 
 bot = telebot.TeleBot(TOKEN)
 supabase: Client = create_client(URL, KEY)
 
-# Маршрут для проксирования запросов к Supabase
+# --- ПРОКСИ-СЕРВЕР ---
 @app.route('/proxy/<path:url>', methods=['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'])
 def supabase_proxy(url):
-    # Формируем реальный адрес в Supabase
     target_url = f"{URL}/{url}"
-    
-    # Копируем заголовки из запроса приложения (кроме Host)
+    # Копируем заголовки, убирая Host
     headers = {k: v for k, v in request.headers if k.lower() != 'host'}
     
     try:
-        # Отправляем запрос от имени сервера Render в Supabase
         resp = requests.request(
             method=request.method,
             url=target_url,
@@ -38,8 +35,7 @@ def supabase_proxy(url):
             params=request.args,
             timeout=10
         )
-        
-        # Передаем ответ обратно в Mini App
+        # Убираем опасные заголовки перед отправкой обратно
         excluded_headers = ['content-encoding', 'transfer-encoding', 'content-length', 'connection']
         proxy_headers = [(k, v) for k, v in resp.headers.items() if k.lower() not in excluded_headers]
         
@@ -47,20 +43,18 @@ def supabase_proxy(url):
     except Exception as e:
         return {"error": str(e)}, 500
 
-# Оставляем стандартный путь для проверки Render
 @app.route('/')
 def health():
-    return "OK", 200
+    return "Proxy and Bot are running", 200
 
 def run_flask():
     port = int(os.environ.get("PORT", 10000))
     app.run(host='0.0.0.0', port=port)
 
-# Запускаем Flask в отдельном потоке
+# Запуск сервера в фоне
 threading.Thread(target=run_flask, daemon=True).start()
 
-# --- ЛОГИКА БОТА (БЕЗ ИЗМЕНЕНИЙ) ---
-
+# --- ЛОГИКА БОТА ---
 @bot.message_handler(commands=['start'])
 def start(message):
     if "pay" in message.text:
@@ -75,7 +69,7 @@ def start(message):
             start_parameter="pay"
         )
     else:
-        bot.send_message(message.chat.id, "Добро пожаловать в НейроСчет! Используйте Mini App.")
+        bot.send_message(message.chat.id, "Добро пожаловать в НейроСчет! Откройте приложение.")
 
 @bot.pre_checkout_query_handler(func=lambda query: True)
 def checkout(query):
@@ -87,9 +81,9 @@ def success(message):
     new_date = (datetime.now() + timedelta(days=30)).isoformat()
     try:
         supabase.table("subscriptions").upsert({"user_id": user_id, "expires_at": new_date}).execute()
-        bot.send_message(message.chat.id, "✅ Оплата прошла успешно! Перезапустите приложение.")
+        bot.send_message(message.chat.id, "✅ Оплата прошла! Доступ продлен.")
     except Exception as e:
         bot.send_message(message.chat.id, "⚠️ Ошибка обновления базы.")
 
-print("Бот и Прокси запущены...")
+print("Система запущена...")
 bot.polling(none_stop=True)
