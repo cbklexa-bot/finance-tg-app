@@ -400,8 +400,10 @@
 
     <script>
         const tg = window.Telegram.WebApp;
-        const { createClient } = supabase;
-        const _supabase = createClient('https://ereiiidezagburttpxtn.supabase.co', 'sb_publishable_YuQ8s49c1LvkCTmoBPQ0hA_7EJ3Z1cj');
+// Используем твой сервер на Render как прокси-мост
+const supabaseUrl = 'https://finance-tg-app.onrender.com/proxy'; 
+const supabaseKey = 'sb_publishable_YuQ8s49c1LvkCTmoBPQ0hA_7EJ3Z1cj';
+const _supabase = supabase.createClient(supabaseUrl, supabaseKey);
         
        let userId = tg.initDataUnsafe?.user?.id?.toString() || 'user_demo';
         let db = [];
@@ -1133,57 +1135,43 @@ async function askAI() {
    async function checkSubscription() {
     try {
         const tgUser = window.tg?.initDataUnsafe?.user;
-        // Используем ID из Telegram или тестовый
-        const currentIdStr = tgUser?.id?.toString() || "6793993761"; 
+        // Твой реальный ID без лишних цифр
+        const currentIdStr = tgUser?.id?.toString() || "679399376"; 
         const numericId = parseInt(currentIdStr);
 
-        // Игнорируем админа
-        if (currentIdStr === "6793993763") return; 
-
-        // Добавляем случайный параметр к запросу, чтобы обойти кэш браузера
+        // Запрос идет через прокси-клиент _supabase
         const { data, error } = await _supabase
             .from('subscriptions')
             .select('expires_at')
             .eq('user_id', numericId)
-            .setHeader('cache-control', 'no-cache') // Прямое указание не кэшировать
             .maybeSingle();
 
-        const now = new Date();
         const payModal = document.getElementById('paywall-modal');
+        const now = new Date();
 
-        if (!data) {
-            // Если записи нет — создаем триал
-            const trialEnd = new Date();
-            trialEnd.setDate(trialEnd.getDate() + 7);
-            await _supabase.from('subscriptions').insert({ 
-                user_id: numericId, 
-                expires_at: trialEnd.toISOString() 
-            });
-            return;
+        if (data && data.expires_at) {
+            const expireDate = new Date(data.expires_at);
+            if (now < expireDate) {
+                // Если оплачено — ПРИНУДИТЕЛЬНО скрываем окно
+                if (payModal) {
+                    payModal.style.display = 'none';
+                    payModal.style.setProperty('display', 'none', 'important');
+                }
+                console.log("Доступ разрешен до:", expireDate);
+                return;
+            }
+        }
+        
+        // Если оплаты нет или срок вышел — показываем окно
+        if (payModal) {
+            payModal.style.display = 'flex';
+            payModal.style.setProperty('display', 'flex', 'important');
         }
 
-        const expireDate = new Date(data.expires_at);
-        console.log("BASE DATE:", expireDate);
-
-        if (now > expireDate) {
-            // ЕСЛИ СРОК ИСТЕК
-            if (payModal) {
-                payModal.style.display = 'flex';
-                payModal.style.setProperty('display', 'flex', 'important');
-            }
-        } else {
-            // ЕСЛИ ВСЁ ОПЛАЧЕНО — ПРИНУДИТЕЛЬНО СКРЫВАЕМ
-            if (payModal) {
-                payModal.style.display = 'none';
-                payModal.style.setProperty('display', 'none', 'important');
-            }
-            console.log("Доступ подтвержден до:", expireDate.toLocaleString());
-        }
     } catch (e) {
-        console.error("Критическая ошибка проверки:", e);
+        console.error("Ошибка связи с прокси-сервером:", e);
     }
 }
-
     // Функция оплаты
     async function buySubscription() {
         const status = document.getElementById('pay-status');
@@ -1390,6 +1378,8 @@ async function askAI() {
     </script>
 </body>
 </html>
+
+
 
 
 
