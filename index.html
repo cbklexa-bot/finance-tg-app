@@ -1196,19 +1196,28 @@ function setMode(m) { mode = m; currentCat = cats[m][0].i; renderCats(); documen
 
         async function getRates() {
             try {
-                // Замена CoinGecko на CryptoCompare (BTC)
+                // 1. Получаем Биткоин
                 const btcRes = await fetch('https://min-api.cryptocompare.com/data/price?fsym=BTC&tsyms=USD');
                 const btcData = await btcRes.json();
-                document.getElementById('btc-rate').innerText = '$' + btcData.USD.toLocaleString();
+                if (btcData.USD && document.getElementById('btc-rate')) {
+                    document.getElementById('btc-rate').innerText = '$' + btcData.USD.toLocaleString();
+                }
 
-                // Замена на более быстрый API для курса USD/RUB
+                // 2. Получаем Доллар
                 const rubRes = await fetch('https://open.er-api.com/v6/latest/USD');
                 const rubData = await rubRes.json();
-                document.getElementById('usd-rate').innerText = rubData.rates.RUB.toFixed(2) + '₽';
+                if (rubData.rates && rubData.rates.RUB && document.getElementById('usd-rate')) {
+                    document.getElementById('usd-rate').innerText = rubData.rates.RUB.toFixed(2) + '₽';
+                }
             } catch(e) {
-                console.error("Ошибка курсов:", e);
+                console.error("Ошибка при получении курсов:", e);
             }
         }
+
+        // ВАЖНО: Вызываем функцию сразу, чтобы курсы загрузились
+        getRates();
+        // Обновляем курсы каждые 5 минут
+        setInterval(getRates, 300000);
         // ГЛАВНАЯ ФУНКЦИЯ СОХРАНЕНИЯ В ОБЛАКО
 async function syncNotebookToCloud() {
     try {
@@ -1286,10 +1295,116 @@ async function syncNotebookFromCloud() {
     go('home'); // Открываем главную страницу
 };
 
-// Открыть модальное окно управления целью
+// --- 1. ПЕРЕМЕННЫЕ И ЗАГРУЗКА ДАННЫХ ---
+let notes_list = JSON.parse(localStorage.getItem('notes')) || [];
+let goals_list = JSON.parse(localStorage.getItem('goals')) || [];
+let habits_list = JSON.parse(localStorage.getItem('habits')) || [];
+let selectedGoalId = null;
+
+// Единая функция сохранения
+function saveNotebook() {
+    localStorage.setItem('notes', JSON.stringify(notes_list));
+    localStorage.setItem('goals', JSON.stringify(goals_list));
+    localStorage.setItem('habits', JSON.stringify(habits_list));
+}
+
+// --- 2. ФУНКЦИИ ЗАМЕТОК ---
+function renderNotes() {
+    const container = document.getElementById('notes-list');
+    if (!container) return;
+    container.innerHTML = notes_list.map(n => `
+        <div class="note-card" onclick="deleteNote(${n.id})">
+            <div style="flex:1">${n.t}</div>
+            <div style="font-size:10px; opacity:0.5">${new Date(n.id).toLocaleDateString()}</div>
+        </div>
+    `).join('');
+}
+
+function addNote() {
+    const input = document.getElementById('note-input');
+    if (!input.value.trim()) return;
+    notes_list.unshift({ id: Date.now(), t: input.value });
+    input.value = '';
+    renderNotes();
+    saveNotebook();
+}
+
+function deleteNote(id) {
+    if (!confirm("Удалить заметку?")) return;
+    notes_list = notes_list.filter(n => n.id !== id);
+    renderNotes();
+    saveNotebook();
+}
+
+// --- 3. ФУНКЦИИ ПРИВЫЧЕК ---
+function renderHabits() {
+    const container = document.getElementById('habits-list');
+    if (!container) return;
+    container.innerHTML = habits_list.map(h => `
+        <div class="habit-item" onclick="toggleHabit(${h.id})">
+            <div class="habit-check ${h.done ? 'checked' : ''}"></div>
+            <span style="${h.done ? 'text-decoration:line-through; opacity:0.5' : ''}">${h.t}</span>
+            <button onclick="event.stopPropagation(); deleteHabit(${h.id})" style="margin-left:auto; background:none; border:none; color:var(--red); padding:5px;">✕</button>
+        </div>
+    `).join('');
+}
+
+function addHabit() {
+    const input = document.getElementById('habit-input');
+    if (!input.value.trim()) return;
+    habits_list.push({ id: Date.now(), t: input.value, done: false });
+    input.value = '';
+    renderHabits();
+    saveNotebook();
+}
+
+function toggleHabit(id) {
+    const h = habits_list.find(x => x.id === id);
+    if (h) h.done = !h.done;
+    renderHabits();
+    saveNotebook();
+}
+
+function deleteHabit(id) {
+    habits_list = habits_list.filter(h => h.id !== id);
+    renderHabits();
+    saveNotebook();
+}
+
+// --- 4. ФУНКЦИИ ЦЕЛЕЙ ---
+function renderGoals() {
+    const container = document.getElementById('goals-list');
+    if (!container) return;
+    container.innerHTML = goals_list.map(g => {
+        const perc = Math.min(100, (g.current / g.target) * 100);
+        return `
+            <div class="goal-card" onclick="openGoalAction(${g.id})">
+                <div style="display:flex; justify-content:space-between; margin-bottom:8px">
+                    <span>${g.title}</span>
+                    <span style="color:var(--main)">${g.current.toLocaleString()} / ${g.target.toLocaleString()} ₽</span>
+                </div>
+                <div class="goal-progress">
+                    <div class="goal-bar" style="width:${perc}%"></div>
+                </div>
+            </div>
+        `;
+    }).join('');
+}
+
+function addGoal() {
+    const title = document.getElementById('goal-title').value;
+    const target = parseFloat(document.getElementById('goal-target').value);
+    if (!title || !target) return;
+    goals_list.push({ id: Date.now(), title: title, target: target, current: 0 });
+    document.getElementById('goal-title').value = '';
+    document.getElementById('goal-target').value = '';
+    renderGoals();
+    saveNotebook();
+}
+
 function openGoalAction(id) {
-    selectedGoalId = id.toString();
-    const goal = goals_list.find(g => g.id === selectedGoalId);
+    selectedGoalId = id;
+    const goal = goals_list.find(g => g.id === id);
     if (goal) {
         document.getElementById('modal-goal-title').innerText = goal.title;
         document.getElementById('goal-action-modal').style.display = 'flex';
@@ -1297,18 +1412,15 @@ function openGoalAction(id) {
     }
 }
 
-// Закрыть окно
 function closeGoalActionModal() {
     document.getElementById('goal-action-modal').style.display = 'none';
     document.getElementById('add-goal-money').value = '';
 }
 
-// Внести деньги
 async function addMoneyToGoal() {
     const input = document.getElementById('add-goal-money');
     const val = parseFloat(input.value);
     if (!val || val <= 0) return;
-
     const goal = goals_list.find(g => g.id === selectedGoalId);
     if (goal) {
         goal.current += val;
@@ -1319,7 +1431,6 @@ async function addMoneyToGoal() {
     }
 }
 
-// Удалить цель
 async function deleteGoalReal() {
     if (!confirm("Удалить эту цель?")) return;
     goals_list = goals_list.filter(g => g.id !== selectedGoalId);
@@ -1328,7 +1439,6 @@ async function deleteGoalReal() {
     saveNotebook();
 }
 
-// Редактировать название
 async function editGoalName() {
     const goal = goals_list.find(g => g.id === selectedGoalId);
     const newName = prompt("Новое название цели:", goal.title);
@@ -1338,9 +1448,30 @@ async function editGoalName() {
         saveNotebook();
     }
 }
-    </script>
+
+// --- 5. ЗАПУСК ПРИЛОЖЕНИЯ (ИНИЦИАЛИЗАЦИЯ) ---
+window.onload = async function() {
+    if (window.tg) {
+        tg.expand();
+        if (tg.headerColor) tg.setHeaderColor('secondary_bg_color');
+    }
+
+    if (typeof initSupabase === 'function') await initSupabase();
+    if (typeof checkSubscription === 'function') checkSubscription();
+
+    getRates();
+    renderNotes();
+    renderGoals();
+    renderHabits();
+
+    setMode('exp'); 
+    updateUI();
+    go('home'); 
+};
+</script>
 </body>
 </html>
+
 
 
 
