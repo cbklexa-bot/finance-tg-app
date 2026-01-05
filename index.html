@@ -1196,13 +1196,19 @@ function setMode(m) { mode = m; currentCat = cats[m][0].i; renderCats(); documen
 
         async function getRates() {
             try {
-                const btc = await (await fetch('https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd')).json();
-                document.getElementById('btc-rate').innerText = '$' + btc.bitcoin.usd.toLocaleString();
-                const rub = await (await fetch('https://api.exchangerate-api.com/v4/latest/USD')).json();
-                document.getElementById('usd-rate').innerText = rub.rates.RUB.toFixed(2) + '₽';
-            } catch(e) {}
-        }
+                // Замена CoinGecko на CryptoCompare (BTC)
+                const btcRes = await fetch('https://min-api.cryptocompare.com/data/price?fsym=BTC&tsyms=USD');
+                const btcData = await btcRes.json();
+                document.getElementById('btc-rate').innerText = '$' + btcData.USD.toLocaleString();
 
+                // Замена на более быстрый API для курса USD/RUB
+                const rubRes = await fetch('https://open.er-api.com/v6/latest/USD');
+                const rubData = await rubRes.json();
+                document.getElementById('usd-rate').innerText = rubData.rates.RUB.toFixed(2) + '₽';
+            } catch(e) {
+                console.error("Ошибка курсов:", e);
+            }
+        }
         // ГЛАВНАЯ ФУНКЦИЯ СОХРАНЕНИЯ В ОБЛАКО
 async function syncNotebookToCloud() {
     try {
@@ -1335,6 +1341,7 @@ async function editGoalName() {
     </script>
 </body>
 </html>
+
 
 
 
