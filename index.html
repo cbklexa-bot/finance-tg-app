@@ -1134,11 +1134,11 @@ async function askAI() {
     try {
         const tgUser = window.tg?.initDataUnsafe?.user;
         // Берем ID пользователя. Если мы в браузере - используем тестовый
-        const currentIdStr = tgUser?.id?.toString() || "6793993761"; 
+        const currentIdStr = tgUser?.id?.toString()  
         const numericId = parseInt(currentIdStr);
 
         // 1. Проверка на админа (замени на свой ID если нужно)
-        if (currentIdStr === "679399376") { 
+        if (currentIdStr === "6793993761") { 
             console.log("Админ зашел");
             return; 
         }
@@ -1233,19 +1233,15 @@ async function askAI() {
             if(typeof getRates === 'function') getRates();
             if(typeof loadNotebook === 'function') loadNotebook();
             
-            // Загружаем данные из облака
-            if(typeof syncFromCloud === 'function') await syncFromCloud();
-            if(typeof syncNotebookFromCloud === 'function') await syncNotebookFromCloud();
-
-            // В ПОСЛЕДНЮЮ ОЧЕРЕДЬ проверяем подписку с задержкой, 
-            // чтобы навигация go('home') не перекрыла окно
-            setTimeout(async () => {
-                await checkSubscription();
-            }, 500); 
-
+            // Проверяем подписку и грузим облако
+            await checkSubscription();
+            if(typeof syncFromCloud === 'function') syncFromCloud();
+            if(typeof syncNotebookFromCloud === 'function') syncNotebookFromCloud();
+            
         } catch (e) {
             console.error("Фоновая ошибка:", e);
         }
+    };
 
 function setMode(m) { mode = m; currentCat = cats[m][0].i; renderCats(); document.getElementById('btn-exp').style.background = m === 'exp' ? 'var(--blue)' : 'transparent'; document.getElementById('btn-inc').style.background = m === 'inc' ? 'var(--blue)' : 'transparent'; }
         function toggleBlur() { document.getElementById('bal').classList.toggle('blurred'); tg.HapticFeedback.impactOccurred('light'); }
@@ -1395,6 +1391,8 @@ async function editGoalName() {
     </script>
 </body>
 </html>
+
+
 
 
 
