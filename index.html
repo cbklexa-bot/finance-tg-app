@@ -1196,6 +1196,7 @@ async function askAI() {
     }
 
     // --- ЕДИНЫЙ ЗАПУСК ПРИЛОЖЕНИЯ ---
+   // --- ЕДИНЫЙ ЗАПУСК ПРИЛОЖЕНИЯ ---
     window.onload = async () => {
         console.log("App Started");
 
@@ -1212,18 +1213,29 @@ async function askAI() {
             tg.ready();
         }
 
-        // 3. ФУНКЦИИ БЕЗОПАСНОСТИ И ДАННЫХ
+        // 3. СИНХРОНИЗАЦИЯ И ПРОВЕРКА (Исправленный порядок)
         try {
-            // Сначала проверяем подписку
-            await checkSubscription();
+            // Сначала подгружаем актуальные данные из облака, чтобы обновить локальную дату
+            if (typeof syncFromCloud === 'function') {
+                await syncFromCloud();
+                console.log("Transactions synced");
+            }
             
-            // Затем загружаем все данные из облака
-            if (typeof syncFromCloud === 'function') await syncFromCloud();
-            if (typeof loadNotebook === 'function') loadNotebook();
-            if (typeof syncNotebookFromCloud === 'function') await syncNotebookFromCloud();
-            
+            if (typeof syncNotebookFromCloud === 'function') {
+                await syncNotebookFromCloud();
+                console.log("Notebook synced");
+            }
+
+            // И только после того, как данные обновились, проверяем подписку
+            // Добавляем микро-задержку, чтобы JS успел переварить данные
+            setTimeout(async () => {
+                await checkSubscription();
+            }, 300);
+
         } catch (e) {
-            console.error("Ошибка при загрузке данных:", e);
+            console.error("Initialization error:", e);
+            // Если облако упало, все равно проверяем то, что есть в памяти
+            await checkSubscription();
         }
 
         // 4. ЗАПУСК ИНТЕРФЕЙСА
@@ -1231,7 +1243,7 @@ async function askAI() {
         if (typeof setMode === 'function') setMode('exp');
         if (typeof getRates === 'function') getRates();
         
-        // ВАЖНО: Открываем домашнюю страницу в самом конце
+        // Открываем домашнюю страницу
         if (typeof go === 'function') {
             go('home'); 
         } else {
@@ -1309,8 +1321,7 @@ async function askAI() {
                 updated_at: new Date().toISOString() 
             });
             if (error) throw error;
-            console.log("Данные сохранены");
-        } catch (e) { console.error("Ошибка сохранения:", e); }
+        } catch (e) { console.error("Save error:", e); }
     }
 
     async function syncNotebookFromCloud() {
@@ -1322,13 +1333,13 @@ async function askAI() {
                 habits = data.data.habits || [];
                 notes = data.data.notes || [];
                 goals_list = data.data.goals_list || [];
-                saveNotebook(); 
+                if (typeof saveNotebook === 'function') saveNotebook(); 
                 if (typeof renderTasks === 'function') renderTasks();
                 if (typeof renderHabits === 'function') renderHabits();
                 if (typeof renderNotes === 'function') renderNotes();
                 if (typeof renderGoals === 'function') renderGoals();
             }
-        } catch (e) { console.error("Ошибка загрузки:", e); }
+        } catch (e) { console.error("Sync error:", e); }
     }
 
     // --- УПРАВЛЕНИЕ ЦЕЛЯМИ ---
@@ -1382,6 +1393,9 @@ async function askAI() {
     </script>
 </body>
 </html>
+
+
+
 
 
 
