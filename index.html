@@ -1136,7 +1136,7 @@ async function askAI() {
     try {
         const tgUser = window.tg?.initDataUnsafe?.user;
         // Твой реальный ID без лишних цифр
-        const currentIdStr = tgUser?.id?.toString() || "679399376"; 
+        const currentIdStr = tgUser?.id?.toString()  
         const numericId = parseInt(currentIdStr);
 
         // Запрос идет через прокси-клиент _supabase
@@ -1378,6 +1378,7 @@ async function askAI() {
     </script>
 </body>
 </html>
+
 
 
 
