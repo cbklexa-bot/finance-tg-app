@@ -202,21 +202,18 @@
     </style>
 </head>
 <body>
-    <div id="paywall-modal">
-    <div class="premium-icon">🧠</div>
-    <h2 style="color:var(--main); margin-bottom:10px;">НейроСчет Premium</h2>
-    <p style="color:var(--text); font-size:14px; margin-bottom:30px; line-height:1.5;">
-        Твой пробный период истек.<br>Оформи доступ, чтобы продолжить.
-    </p>
-    <div class="pay-card">
-        <div style="color:var(--text); font-size:12px; text-transform:uppercase;">Месячная подписка</div>
-        <div style="font-size:32px; font-weight:800; color:var(--main); margin:10px 0;">199 ₽</div>
-        <div style="color:var(--green); font-size:13px; font-weight:bold;">Первые 7 дней бесплатно!</div>
+    <div id="paywall-modal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:var(--bg); z-index:10000; flex-direction:column; align-items:center; justify-content:center; padding:20px; text-align:center;">
+    <div style="font-size: 64px; margin-bottom: 20px;">💎</div>
+    <h2 style="color:var(--main); margin-bottom: 10px;">Подписка истекла</h2>
+    <p id="paywall-text" style="color:var(--text); margin-bottom: 30px; line-height: 1.5;">Для продолжения использования всех функций приложения, пожалуйста, продлите подписку.</p>
+    
+    <div style="width:100%; max-width:280px; margin: 0 auto;">
+        <button onclick="buySubscription()" style="width:100%; padding:16px; border-radius:16px; background:var(--blue); color:white; border:none; font-size:18px; font-weight:bold; cursor:pointer;">
+            Продлить (199₽)
+        </button>
+        <p id="pay-status" style="color:var(--text); margin-top:15px; font-size:14px;"></p>
     </div>
-    <button onclick="buySubscription()" class="save-btn" style="max-width:300px;">Активировать доступ</button>
-    <div id="pay-status" style="margin-top:15px; color:var(--text); font-size:12px;"></div>
 </div>
-
     <div id="edit-modal"><div class="modal-content">
         <h3 style="text-align:center;">Редактировать</h3>
         <input type="number" id="edit-sum" class="sum-in">
@@ -1139,37 +1136,33 @@ async function askAI() {
 
      // --- ЛОГИКА ПОДПИСКИ ---
 async function checkSubscription() {
-    // Вставь сюда свой ID, чтобы тебя никогда не блокировало
-    if (userId === "6793993761") return; 
+    if (userId === "6793993761") return; // Твой ID (тебе всегда можно)
 
     try {
         const numericId = parseInt(userId);
-        if (isNaN(numericId) || userId === 'user_demo') return;
-
-        let { data, error } = await _supabase.from('subscriptions').select('*').eq('user_id', numericId).single();
+        let { data } = await _supabase.from('subscriptions').select('*').eq('user_id', numericId).single();
         const now = new Date();
 
-        // ЕСЛИ ПОЛЬЗОВАТЕЛЯ НЕТ В БАЗЕ (Первый вход)
+        // ЕСЛИ ПОЛЬЗОВАТЕЛЯ НЕТ (НОВЫЙ)
         if (!data) {
             const trialEnd = new Date();
-            trialEnd.setDate(trialEnd.getDate() + 7); // Добавляем 7 дней
+            trialEnd.setDate(trialEnd.getDate() + 7); // Дарим 7 дней
             
-            // Записываем нового пользователя в таблицу
             await _supabase.from('subscriptions').insert({ 
                 user_id: numericId, 
                 expires_at: trialEnd.toISOString() 
             });
-            console.log("Триал 7 дней активирован");
-            return; // Пускаем пользоваться
+            console.log("Новому пользователю выдано 7 дней");
+            return; // Пускаем в приложение
         }
 
-        // ЕСЛИ ПОЛЬЗОВАТЕЛЬ ЕСТЬ - ПРОВЕРЯЕМ ДАТУ
+        // ЕСЛИ ПОЛЬЗОВАТЕЛЬ ЕСТЬ, НО СРОК ВЫШЕЛ
         if (now > new Date(data.expires_at)) {
             document.getElementById('paywall-modal').style.display = 'flex';
             if(window.tg) tg.HapticFeedback.notificationOccurred('error');
         }
     } catch (e) { 
-        console.error("Ошибка проверки подписки:", e); 
+        console.error("Ошибка подписки:", e); 
     }
 }
 
@@ -1347,6 +1340,7 @@ async function editGoalName() {
     </script>
 </body>
 </html>
+
 
 
 
