@@ -35,7 +35,7 @@ def start(message):
             invoice_payload="month_sub",
             provider_token="", # Для Stars всегда пусто
             currency="XTR",    # Валюта Stars
-            prices=[telebot.types.LabeledPrice(label="Продлить", amount=199)],
+            prices=[telebot.types.LabeledPrice(label="Продлить", amount=100)],
             start_parameter="pay"
         )
     else:
