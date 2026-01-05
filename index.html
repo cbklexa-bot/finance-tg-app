@@ -1131,52 +1131,55 @@ async function askAI() {
 
     // Функция проверки подписки
     async function checkSubscription() {
-        try {
-            // Получаем ID заново, используя другое имя переменной, чтобы не было ошибки
-            const tgUser = window.tg?.initDataUnsafe?.user;
-            const currentIdStr = tgUser?.id?.toString() || "6793993761"; // Твой ID как резерв
+    try {
+        const tgUser = window.tg?.initDataUnsafe?.user;
+        // Берем ID пользователя. Если мы в браузере - используем тестовый
+        const currentIdStr = tgUser?.id?.toString() || "6793993761"; 
+        const numericId = parseInt(currentIdStr);
 
-            // Проверка админа (твой ID)
-            if (currentIdStr === "6793993761") { 
-                console.log("Администратор: проверка пропущена");
-                return; 
-            }
-
-            const numericId = parseInt(currentIdStr);
-            if (isNaN(numericId)) return;
-
-            // Запрос к базе
-            let { data, error } = await _supabase
-                .from('subscriptions')
-                .select('*')
-                .eq('user_id', numericId)
-                .single();
-
-            const now = new Date();
-
-            // 1. Если пользователя нет — даем 7 дней бесплатно
-            if (!data) {
-                const trialEnd = new Date();
-                trialEnd.setDate(trialEnd.getDate() + 7);
-                
-                await _supabase.from('subscriptions').insert({ 
-                    user_id: numericId, 
-                    expires_at: trialEnd.toISOString() 
-                });
-                console.log("Выдан пробный период");
-                return;
-            }
-
-            // 2. Если срок вышел — показываем окно оплаты
-            const expireDate = new Date(data.expires_at);
-            if (now > expireDate) {
-                document.getElementById('paywall-modal').style.display = 'flex';
-            }
-
-        } catch (e) {
-            console.error("Ошибка подписки:", e);
+        // 1. Проверка на админа (замени на свой ID если нужно)
+        if (currentIdStr === "679399376") { 
+            console.log("Админ зашел");
+            return; 
         }
+
+        let { data, error } = await _supabase
+            .from('subscriptions')
+            .select('*')
+            .eq('user_id', numericId)
+            .single();
+
+        const now = new Date();
+
+        if (!data) {
+            // Если записи нет - создаем 7 дней
+            const trialEnd = new Date();
+            trialEnd.setDate(trialEnd.getDate() + 7);
+            await _supabase.from('subscriptions').insert({ 
+                user_id: numericId, 
+                expires_at: trialEnd.toISOString() 
+            });
+            return;
+        }
+
+        // ПРОВЕРКА ДАТЫ
+        const expireDate = new Date(data.expires_at);
+        
+        if (now > expireDate) {
+            console.log("Доступ истек, показываем окно");
+            // Показываем окно и блокируем закрытие через таймер
+            setTimeout(() => {
+                const payModal = document.getElementById('paywall-modal');
+                if (payModal) {
+                    payModal.style.setProperty('display', 'flex', 'important');
+                    payModal.style.zIndex = "20000"; // Выше всех модалок
+                }
+            }, 500); // Задержка, чтобы страница успела загрузиться
+        }
+    } catch (e) {
+        console.error("Ошибка подписки:", e);
     }
+}
 
     // Функция оплаты
     async function buySubscription() {
@@ -1388,6 +1391,7 @@ async function editGoalName() {
     </script>
 </body>
 </html>
+
 
 
 
