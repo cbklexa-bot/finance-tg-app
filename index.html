@@ -202,18 +202,21 @@
     </style>
 </head>
 <body>
-    <div id="paywall-modal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:var(--bg); z-index:10000; flex-direction:column; align-items:center; justify-content:center; padding:20px; text-align:center;">
-    <div style="font-size: 64px; margin-bottom: 20px;">💎</div>
-    <h2 style="color:var(--main); margin-bottom: 10px;">Подписка истекла</h2>
-    <p id="paywall-text" style="color:var(--text); margin-bottom: 30px; line-height: 1.5;">Для продолжения использования всех функций приложения, пожалуйста, продлите подписку.</p>
-    
-    <div style="width:100%; max-width:280px; margin: 0 auto;">
-        <button onclick="buySubscription()" style="width:100%; padding:16px; border-radius:16px; background:var(--blue); color:white; border:none; font-size:18px; font-weight:bold; cursor:pointer;">
-            Продлить (199₽)
-        </button>
-        <p id="pay-status" style="color:var(--text); margin-top:15px; font-size:14px;"></p>
+    <div id="paywall-modal">
+    <div class="premium-icon">🧠</div>
+    <h2 style="color:var(--main); margin-bottom:10px;">НейроСчет Premium</h2>
+    <p style="color:var(--text); font-size:14px; margin-bottom:30px; line-height:1.5;">
+        Твой пробный период истек.<br>Оформи доступ, чтобы продолжить.
+    </p>
+    <div class="pay-card">
+        <div style="color:var(--text); font-size:12px; text-transform:uppercase;">Месячная подписка</div>
+        <div style="font-size:32px; font-weight:800; color:var(--main); margin:10px 0;">199 ₽</div>
+        <div style="color:var(--green); font-size:13px; font-weight:bold;">Первые 7 дней бесплатно!</div>
     </div>
+    <button onclick="buySubscription()" class="save-btn" style="max-width:300px;">Активировать доступ</button>
+    <div id="pay-status" style="margin-top:15px; color:var(--text); font-size:12px;"></div>
 </div>
+
     <div id="edit-modal"><div class="modal-content">
         <h3 style="text-align:center;">Редактировать</h3>
         <input type="number" id="edit-sum" class="sum-in">
@@ -589,33 +592,23 @@
 
         // --- Сохранение и Синхронизация Блокнота ---
         async function cloudSaveNotebook() {
-    const notebookData = { tasks, habits, notes, goals: goals_list };
-    try {
-        const { error } = await _supabase.from('notebook').upsert({ 
-            id: userId, 
-            data: notebookData, 
-            updated_at: new Date() 
-        }, { onConflict: 'id' });
-        
-        if (error) console.error("Ошибка Supabase:", error);
-    } catch (e) {
-        console.error("Ошибка сохранения в облако:", e);
-    }
-}
+            const notebookData = { tasks, habits, notes, goals };
+            const { error } = await _supabase.from('notebook').upsert({ id: userId, data: notebookData, updated_at: new Date() }, { onConflict: 'id' });
+        }
 
          function saveNotebook() {
-    localStorage.setItem('fin_tasks_' + userId, JSON.stringify(tasks));
-    localStorage.setItem('fin_habits_' + userId, JSON.stringify(habits));
-    localStorage.setItem('fin_notes_' + userId, JSON.stringify(notes));
-    localStorage.setItem('fin_goals_' + userId, JSON.stringify(goals_list)); 
-    cloudSaveNotebook(); // вызываем сохранение в облако
-} 
+             localStorage.setItem('fin_tasks_' + userId, JSON.stringify(tasks));
+             localStorage.setItem('fin_habits_' + userId, JSON.stringify(habits));
+             localStorage.setItem('fin_notes_' + userId, JSON.stringify(notes));
+             localStorage.setItem('fin_goals_' + userId, JSON.stringify(goals_list)); 
+             cloudSaveNotebook();
+        } 
 
         function loadNotebook() {
-    tasks = JSON.parse(localStorage.getItem('fin_tasks_' + userId)) || [];
-    habits = JSON.parse(localStorage.getItem('fin_habits_' + userId)) || [];
-    notes = JSON.parse(localStorage.getItem('fin_notes_' + userId)) || [];
-    goals_list = JSON.parse(localStorage.getItem('fin_goals_' + userId)) || [];
+            const t = localStorage.getItem('fin_tasks_' + userId);
+    const h = localStorage.getItem('fin_habits_' + userId);
+    const n = localStorage.getItem('fin_notes_' + userId);
+    const g = localStorage.getItem('fin_goals_' + userId);
     
     if(t) tasks = JSON.parse(t);
     if(h) habits = JSON.parse(h);
@@ -626,26 +619,23 @@
     renderTasks(); 
     renderHabits(); 
     renderNotes();
-    renderGoals(); // отрисовываем их на экране
+    renderGoals(); // ОБЯЗАТЕЛЬНО: отрисовываем цели после загрузки
 }
 
 // 1. ЗАГРУЗКА ДАННЫХ ИЗ ОБЛАКА
         async function syncNotebookFromCloud() {
-    try {
-        const { data } = await _supabase.from('notebook').select('data').eq('id', userId).single();
-        if (data && data.data) {
-            tasks = data.data.tasks || [];
-            habits = data.data.habits || [];
-            notes = data.data.notes || [];
-            goals_list = data.data.goals || []; 
-            
-            saveNotebook(); // 
-            renderTasks(); renderHabits(); renderNotes(); renderGoals();
+            try {
+                const { data } = await _supabase.from('notebook').select('data').eq('id', userId).single();
+                if (data && data.data) {
+                    tasks = data.data.tasks || [];
+                    habits = data.data.habits || [];
+                    notes = data.data.notes || [];
+                    goals_list = data.data.goals_list || []; 
+                    saveNotebook();
+                    renderTasks(); renderHabits(); renderNotes(); renderGoals();
+                }
+            } catch (e) { console.error("Ошибка загрузки:", e); }
         }
-    } catch (e) {
-        console.error("Ошибка синхронизации из облака:", e);
-    }
-}
 
         // 2. ФУНКЦИЯ СОЗДАНИЯ ЦЕЛИ
         async function addGoal() {
@@ -734,19 +724,20 @@
         }
 
         async function addMoneyToGoal() {
-    const input = document.getElementById('add-goal-money');
-    const val = parseFloat(input.value);
-    if (!val || val <= 0) return;
+            const amountInput = document.getElementById('add-goal-money');
+            const amount = parseFloat(amountInput.value);
+            if (isNaN(amount) || amount <= 0) return;
 
-    const goal = goals_list.find(g => g.id === selectedGoalId);
-    if (goal) {
-        goal.current += val;
-        closeGoalActionModal();
-        renderGoals();
-        saveNotebook(); // <-- ПРОСТО ВЫЗОВИ ЭТУ ФУНКЦИЮ! Она сохранит и в телефон, и в облако.
-        if(window.tg) tg.HapticFeedback.notificationOccurred('success');
-    }
-}
+            const goal = goals_list.find(g => g.id === selectedGoalId);
+            if (goal) {
+                goal.current += amount; // Плюсуем деньги
+                amountInput.value = '';
+                closeGoalActionModal();
+                renderGoals();
+                await syncNotebookToCloud();
+                tg.HapticFeedback.notificationOccurred('success');
+            }
+        }
 
         async function editGoalName() {
             const goal = goals_list.find(g => g.id === selectedGoalId);
@@ -760,12 +751,12 @@
         }
 
         async function deleteGoalReal() {
-    if (!confirm("Удалить эту цель?")) return;
-    goals_list = goals_list.filter(g => g.id !== selectedGoalId);
-    closeGoalActionModal();
-    renderGoals();
-    saveNotebook(); // <-- И ЗДЕСЬ ТОЖЕ!
-}
+            if (!confirm("Удалить эту цель?")) return;
+            goals_list = goals_list.filter(g => g.id !== selectedGoalId);
+            closeGoalActionModal();
+            renderGoals();
+            await syncNotebookToCloud();
+        }
 
         function closeGoalActionModal() {
             const modal = document.getElementById('goal-action-modal');
@@ -1136,55 +1127,64 @@ async function askAI() {
 
      // --- ЛОГИКА ПОДПИСКИ ---
 async function checkSubscription() {
-    if (userId === "6793993761") return; // Твой ID (тебе всегда можно)
-
     try {
+        if (userId === "679399376") { 
+        return; // Проверка прекращается, доступ открыт всегда
+    }
+
         const numericId = parseInt(userId);
-        let { data } = await _supabase.from('subscriptions').select('*').eq('user_id', numericId).single();
+        if (isNaN(numericId) || userId === 'user_demo') return; 
+
+        // Запрос к Supabase
+        let { data, error } = await _supabase.from('subscriptions').select('*').eq('user_id', numericId).single();
         const now = new Date();
 
-        // ЕСЛИ ПОЛЬЗОВАТЕЛЯ НЕТ (НОВЫЙ)
         if (!data) {
+            // Если пользователя нет, создаем пробный период на 7 дней
             const trialEnd = new Date();
-            trialEnd.setDate(trialEnd.getDate() + 7); // Дарим 7 дней
-            
+            trialEnd.setDate(trialEnd.getDate() + 7);
             await _supabase.from('subscriptions').insert({ 
                 user_id: numericId, 
+                is_trial_used: true, 
                 expires_at: trialEnd.toISOString() 
             });
-            console.log("Новому пользователю выдано 7 дней");
-            return; // Пускаем в приложение
+            return;
         }
 
-        // ЕСЛИ ПОЛЬЗОВАТЕЛЬ ЕСТЬ, НО СРОК ВЫШЕЛ
-        if (now > new Date(data.expires_at)) {
+        // Проверка даты истечения
+        const expireDate = new Date(data.expires_at);
+        if (now > expireDate) {
             document.getElementById('paywall-modal').style.display = 'flex';
-            if(window.tg) tg.HapticFeedback.notificationOccurred('error');
         }
-    } catch (e) { 
-        console.error("Ошибка подписки:", e); 
+    } catch (e) {
+        console.error("Ошибка подписки:", e);
     }
 }
 
 async function buySubscription() {
     const status = document.getElementById('pay-status');
-    status.innerText = "Формируем счет...";
-
-    // 1. Уведомляем пользователя, что нужно оплатить в боте
-    // В идеале здесь должен быть запрос к твоему серверу за ссылкой
+    status.innerText = "Обработка платежа...";
     
-    setTimeout(() => {
-        status.innerText = "Пожалуйста, напишите боту /pay для оплаты";
+    const numericId = parseInt(userId);
+    
+    // Имитация оплаты (через 1.5 сек продлеваем в базе)
+    setTimeout(async () => {
+        const newDate = new Date();
+        newDate.setDate(newDate.getDate() + 30); // Продлеваем на 30 дней
         
-        // Автоматически перекидываем пользователя в чат с ботом через 2 секунды
-        setTimeout(() => {
-            if (window.tg) {
-                // Замени 'YOUR_BOT_USERNAME' на имя своего бота без @
-                tg.openTelegramLink("https://t.me/YOUR_BOT_USERNAME?start=pay");
-                tg.close(); // Закрываем мини-апп, чтобы пользователь увидел чат
-            }
-        }, 1500);
-    }, 1000);
+        const { error } = await _supabase.from('subscriptions').upsert({ 
+            user_id: numericId, 
+            expires_at: newDate.toISOString(),
+            is_trial_used: true 
+        });
+
+        if (!error) {
+            document.getElementById('paywall-modal').style.display = 'none';
+            alert("Поздравляем! Доступ продлен на 30 дней.");
+        } else {
+            status.innerText = "Ошибка при обновлении. Попробуйте позже.";
+        }
+    }, 1500);
 }   
 
 function setMode(m) { mode = m; currentCat = cats[m][0].i; renderCats(); document.getElementById('btn-exp').style.background = m === 'exp' ? 'var(--blue)' : 'transparent'; document.getElementById('btn-inc').style.background = m === 'inc' ? 'var(--blue)' : 'transparent'; }
@@ -1196,19 +1196,13 @@ function setMode(m) { mode = m; currentCat = cats[m][0].i; renderCats(); documen
 
         async function getRates() {
             try {
-                // Замена CoinGecko на CryptoCompare (BTC)
-                const btcRes = await fetch('https://min-api.cryptocompare.com/data/price?fsym=BTC&tsyms=USD');
-                const btcData = await btcRes.json();
-                document.getElementById('btc-rate').innerText = '$' + btcData.USD.toLocaleString();
-
-                // Замена на более быстрый API для курса USD/RUB
-                const rubRes = await fetch('https://open.er-api.com/v6/latest/USD');
-                const rubData = await rubRes.json();
-                document.getElementById('usd-rate').innerText = rubData.rates.RUB.toFixed(2) + '₽';
-            } catch(e) {
-                console.error("Ошибка курсов:", e);
-            }
+                const btc = await (await fetch('https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd')).json();
+                document.getElementById('btc-rate').innerText = '$' + btc.bitcoin.usd.toLocaleString();
+                const rub = await (await fetch('https://api.exchangerate-api.com/v4/latest/USD')).json();
+                document.getElementById('usd-rate').innerText = rub.rates.RUB.toFixed(2) + '₽';
+            } catch(e) {}
         }
+
         // ГЛАВНАЯ ФУНКЦИЯ СОХРАНЕНИЯ В ОБЛАКО
 async function syncNotebookToCloud() {
     try {
@@ -1314,7 +1308,7 @@ async function addMoneyToGoal() {
         goal.current += val;
         closeGoalActionModal();
         renderGoals();
-        saveNotebook();
+        if (typeof syncNotebookToCloud === 'function') await syncNotebookToCloud();
         if(window.tg) tg.HapticFeedback.notificationOccurred('success');
     }
 }
@@ -1325,7 +1319,7 @@ async function deleteGoalReal() {
     goals_list = goals_list.filter(g => g.id !== selectedGoalId);
     closeGoalActionModal();
     renderGoals();
-    saveNotebook();
+    if (typeof syncNotebookToCloud === 'function') await syncNotebookToCloud();
 }
 
 // Редактировать название
@@ -1335,12 +1329,13 @@ async function editGoalName() {
     if (newName) {
         goal.title = newName;
         renderGoals();
-        saveNotebook();
+        if (typeof syncNotebookToCloud === 'function') await syncNotebookToCloud();
     }
 }
     </script>
 </body>
 </html>
+
 
 
 
