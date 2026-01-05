@@ -1128,32 +1128,42 @@ async function askAI() {
      // --- ЛОГИКА ПОДПИСКИ ---
 async function checkSubscription() {
     try {
-        if (userId === "679399376") { 
-        return; // Проверка прекращается, доступ открыт всегда
-    }
+        // 1. Твой ID (проверь, чтобы было 10 цифр)
+        if (userId === "6793993761") { 
+            console.log("Доступ администратора");
+            return; 
+        }
 
         const numericId = parseInt(userId);
         if (isNaN(numericId) || userId === 'user_demo') return; 
 
-        // Запрос к Supabase
-        let { data, error } = await _supabase.from('subscriptions').select('*').eq('user_id', numericId).single();
+        // 2. Запрос к таблице subscriptions
+        let { data, error } = await _supabase
+            .from('subscriptions')
+            .select('*')
+            .eq('user_id', numericId)
+            .single();
+
         const now = new Date();
 
+        // 3. ЕСЛИ ПОЛЬЗОВАТЕЛЯ НЕТ — ДАРИМ 7 ДНЕЙ
         if (!data) {
-            // Если пользователя нет, создаем пробный период на 7 дней
             const trialEnd = new Date();
             trialEnd.setDate(trialEnd.getDate() + 7);
+            
             await _supabase.from('subscriptions').insert({ 
                 user_id: numericId, 
-                is_trial_used: true, 
                 expires_at: trialEnd.toISOString() 
             });
+            
+            console.log("Выдан пробный период на 7 дней");
             return;
         }
 
-        // Проверка даты истечения
+        // 4. ПРОВЕРКА СРОКА (и триала, и купленной подписки)
         const expireDate = new Date(data.expires_at);
         if (now > expireDate) {
+            // Показываем окно оплаты, если время вышло
             document.getElementById('paywall-modal').style.display = 'flex';
         }
     } catch (e) {
@@ -1161,32 +1171,20 @@ async function checkSubscription() {
     }
 }
 
+// ФУНКЦИЯ ПОКУПКИ ЧЕРЕЗ БОТА (Telegram Stars)
 async function buySubscription() {
     const status = document.getElementById('pay-status');
-    status.innerText = "Обработка платежа...";
-    
-    const numericId = parseInt(userId);
-    
-    // Имитация оплаты (через 1.5 сек продлеваем в базе)
-    setTimeout(async () => {
-        const newDate = new Date();
-        newDate.setDate(newDate.getDate() + 30); // Продлеваем на 30 дней
-        
-        const { error } = await _supabase.from('subscriptions').upsert({ 
-            user_id: numericId, 
-            expires_at: newDate.toISOString(),
-            is_trial_used: true 
-        });
+    if (status) status.innerText = "Переходим к оплате в боте...";
 
-        if (!error) {
-            document.getElementById('paywall-modal').style.display = 'none';
-            alert("Поздравляем! Доступ продлен на 30 дней.");
-        } else {
-            status.innerText = "Ошибка при обновлении. Попробуйте позже.";
+    setTimeout(() => {
+        if (window.tg) {
+            // Ссылка на твоего бота с параметром pay
+            // Бот перехватит этот параметр и сразу выдаст инвойс на 100 звезд
+            tg.openTelegramLink("https://t.me/Finans_Neyro_bot?start=pay");
+            tg.close(); // Закрываем приложение, чтобы юзер увидел чат
         }
-    }, 1500);
-}   
-
+    }, 1000);
+}
 function setMode(m) { mode = m; currentCat = cats[m][0].i; renderCats(); document.getElementById('btn-exp').style.background = m === 'exp' ? 'var(--blue)' : 'transparent'; document.getElementById('btn-inc').style.background = m === 'inc' ? 'var(--blue)' : 'transparent'; }
         function toggleBlur() { document.getElementById('bal').classList.toggle('blurred'); tg.HapticFeedback.impactOccurred('light'); }
         function openEdit(id) { editingId = id; const item = db.find(x => x.id === id); document.getElementById('edit-sum').value = item.s; document.getElementById('edit-note').value = item.n; document.getElementById('edit-modal').style.display = 'flex'; }
@@ -1335,6 +1333,7 @@ async function editGoalName() {
     </script>
 </body>
 </html>
+
 
 
 
