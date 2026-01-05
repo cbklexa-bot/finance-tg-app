@@ -1133,23 +1133,23 @@ async function askAI() {
    async function checkSubscription() {
     try {
         const tgUser = window.tg?.initDataUnsafe?.user;
-        // УБЕДИСЬ, ЧТО ЭТОТ ID СОВПАДАЕТ С ID В ТАБЛИЦЕ SUPABASE
         const currentIdStr = tgUser?.id?.toString() || "6793993761"; 
         const numericId = parseInt(currentIdStr);
 
-        // Проверка админа (если это твой ID — окно не вылезет)
-        if (currentIdStr === "679399376") return; 
+        // 1. Игнорируем админа
+        if (currentIdStr === "6793993762") return; 
 
-        let { data, error } = await _supabase
+        // 2. ЗАПРОС ПРЯМО В БАЗУ (без кэша)
+        const { data, error } = await _supabase
             .from('subscriptions')
-            .select('*')
+            .select('expires_at')
             .eq('user_id', numericId)
-            .single();
+            .maybeSingle();
 
         const now = new Date();
 
         if (!data) {
-            // Если в базе пусто, создаем триал и выходим
+            // Если пользователя нет, создаем триал
             const trialEnd = new Date();
             trialEnd.setDate(trialEnd.getDate() + 7);
             await _supabase.from('subscriptions').insert({ 
@@ -1159,22 +1159,26 @@ async function askAI() {
             return;
         }
 
+        // 3. ПРОВЕРКА АКТУАЛЬНОЙ ДАТЫ
         const expireDate = new Date(data.expires_at);
-        
-        // СРАВНЕНИЕ ДАТ
+        console.log("Дата истечения из базы:", expireDate);
+        console.log("Текущая дата:", now);
+
         if (now > expireDate) {
-            console.log("СРОК ИСТЕК");
-            // Используем таймаут, чтобы окно появилось ПОСЛЕ загрузки всех страниц
-            setTimeout(() => {
-                const payModal = document.getElementById('paywall-modal');
-                if (payModal) {
-                    payModal.style.setProperty('display', 'flex', 'important');
-                    payModal.style.zIndex = "999999"; // Максимальный приоритет
-                }
-            }, 1000); 
+            console.log("Доступ закрыт");
+            const payModal = document.getElementById('paywall-modal');
+            if (payModal) {
+                payModal.style.setProperty('display', 'flex', 'important');
+                payModal.style.zIndex = "100000";
+            }
+        } else {
+            console.log("Доступ разрешен");
+            // На всякий случай скрываем окно, если оно вылезло по ошибке
+            const payModal = document.getElementById('paywall-modal');
+            if (payModal) payModal.style.display = 'none';
         }
     } catch (e) {
-        console.error("Ошибка:", e);
+        console.error("Ошибка проверки:", e);
     }
 }
 
@@ -1393,6 +1397,8 @@ async function askAI() {
     </script>
 </body>
 </html>
+
+
 
 
 
