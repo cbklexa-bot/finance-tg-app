@@ -1201,63 +1201,54 @@ async function askAI() {
         }
     }
 
-    // --- ЕДИНЫЙ ЗАПУСК ПРИЛОЖЕНИЯ ---
    // --- ЕДИНЫЙ ЗАПУСК ПРИЛОЖЕНИЯ ---
-    window.onload = async () => {
-        console.log("App Started");
+   window.onload = async () => {
+    console.log("App Started");
 
-        // 1. Настройка дат
-        const today = new Date().toISOString().split('T')[0];
-        const datePicker = document.getElementById('date-picker');
-        const taskDate = document.getElementById('task-date');
-        if (datePicker) datePicker.value = today;
-        if (taskDate) taskDate.value = today;
+    // 1. Настройка дат
+    const today = new Date().toISOString().split('T')[0];
+    const datePicker = document.getElementById('date-picker');
+    const taskDate = document.getElementById('task-date');
+    if (datePicker) datePicker.value = today;
+    if (taskDate) taskDate.value = today;
 
-        // 2. Инициализация Telegram
-        if (window.tg) {
-            tg.expand();
-            tg.ready();
-        }
+    // 2. Инициализация Telegram
+    if (window.tg) {
+        tg.expand();
+        tg.ready();
+    }
 
-        // 3. СИНХРОНИЗАЦИЯ И ПРОВЕРКА (Исправленный порядок)
-        try {
-            // Сначала подгружаем актуальные данные из облака, чтобы обновить локальную дату
-            if (typeof syncFromCloud === 'function') {
-                await syncFromCloud();
-                console.log("Transactions synced");
-            }
-            
-            if (typeof syncNotebookFromCloud === 'function') {
-                await syncNotebookFromCloud();
-                console.log("Notebook synced");
-            }
-
-            // И только после того, как данные обновились, проверяем подписку
-            // Добавляем микро-задержку, чтобы JS успел переварить данные
-            setTimeout(async () => {
-                await checkSubscription();
-            }, 300);
-
-        } catch (e) {
-            console.error("Initialization error:", e);
-            // Если облако упало, все равно проверяем то, что есть в памяти
-            await checkSubscription();
-        }
-
-        // 4. ЗАПУСК ИНТЕРФЕЙСА
-        if (typeof renderGoals === 'function') renderGoals();
-        if (typeof setMode === 'function') setMode('exp');
-        if (typeof getRates === 'function') getRates();
+    // 3. СИНХРОНИЗАЦИЯ И ЖЕСТКАЯ ПРОВЕРКА
+    try {
+        // Сначала тянем данные из облака (транзакции и блокнот)
+        if (typeof syncFromCloud === 'function') await syncFromCloud();
+        if (typeof syncNotebookFromCloud === 'function') await syncNotebookFromCloud();
         
-        // Открываем домашнюю страницу
-        if (typeof go === 'function') {
-            go('home'); 
-        } else {
-            document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
-            const homePage = document.getElementById('home');
-            if (homePage) homePage.classList.add('active');
-        }
-    };
+        console.log("Data synced. Checking subscription...");
+
+        // ЖДЕМ завершения проверки подписки перед тем как рисовать интерфейс
+        await checkSubscription(); 
+
+    } catch (e) {
+        console.error("Initialization error:", e);
+        // Если база недоступна, проверяем локально
+        await checkSubscription();
+    }
+
+    // 4. ЗАПУСК ИНТЕРФЕЙСА (только после проверки выше)
+    if (typeof renderGoals === 'function') renderGoals();
+    if (typeof setMode === 'function') setMode('exp');
+    if (typeof getRates === 'function') getRates();
+    
+    // Открываем домашнюю страницу
+    if (typeof go === 'function') {
+        go('home'); 
+    } else {
+        document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+        const homePage = document.getElementById('home');
+        if (homePage) homePage.classList.add('active');
+    }
+};
 
     // --- ФУНКЦИИ УПРАВЛЕНИЯ ---
     function setMode(m) { 
@@ -1399,7 +1390,8 @@ async function askAI() {
     </script>
 </body>
 </html>
->
+
+
 
 
 
