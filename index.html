@@ -1168,28 +1168,23 @@ async function checkSubscription() {
 
 async function buySubscription() {
     const status = document.getElementById('pay-status');
-    status.innerText = "Обработка платежа...";
-    
-    const numericId = parseInt(userId);
-    
-    // Имитация оплаты (через 1.5 сек продлеваем в базе)
-    setTimeout(async () => {
-        const newDate = new Date();
-        newDate.setDate(newDate.getDate() + 30); // Продлеваем на 30 дней
-        
-        const { error } = await _supabase.from('subscriptions').upsert({ 
-            user_id: numericId, 
-            expires_at: newDate.toISOString(),
-            is_trial_used: true 
-        });
+    status.innerText = "Формируем счет...";
 
-        if (!error) {
-            document.getElementById('paywall-modal').style.display = 'none';
-            alert("Поздравляем! Доступ продлен на 30 дней.");
-        } else {
-            status.innerText = "Ошибка при обновлении. Попробуйте позже.";
-        }
-    }, 1500);
+    // 1. Уведомляем пользователя, что нужно оплатить в боте
+    // В идеале здесь должен быть запрос к твоему серверу за ссылкой
+    
+    setTimeout(() => {
+        status.innerText = "Пожалуйста, напишите боту /pay для оплаты";
+        
+        // Автоматически перекидываем пользователя в чат с ботом через 2 секунды
+        setTimeout(() => {
+            if (window.tg) {
+                // Замени 'YOUR_BOT_USERNAME' на имя своего бота без @
+                tg.openTelegramLink("https://t.me/YOUR_BOT_USERNAME?start=pay");
+                tg.close(); // Закрываем мини-апп, чтобы пользователь увидел чат
+            }
+        }, 1500);
+    }, 1000);
 }   
 
 function setMode(m) { mode = m; currentCat = cats[m][0].i; renderCats(); document.getElementById('btn-exp').style.background = m === 'exp' ? 'var(--blue)' : 'transparent'; document.getElementById('btn-inc').style.background = m === 'inc' ? 'var(--blue)' : 'transparent'; }
@@ -1340,6 +1335,7 @@ async function editGoalName() {
     </script>
 </body>
 </html>
+
 
 
 
