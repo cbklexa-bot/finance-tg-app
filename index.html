@@ -1130,18 +1130,15 @@ async function askAI() {
      // --- ЛОГИКА ПОДПИСКИ ---
 
     // Функция проверки подписки
-    async function checkSubscription() {
+   async function checkSubscription() {
     try {
         const tgUser = window.tg?.initDataUnsafe?.user;
-        // Берем ID пользователя. Если мы в браузере - используем тестовый
-        const currentIdStr = tgUser?.id?.toString()  
+        // УБЕДИСЬ, ЧТО ЭТОТ ID СОВПАДАЕТ С ID В ТАБЛИЦЕ SUPABASE
+        const currentIdStr = tgUser?.id?.toString() || "6793993761"; 
         const numericId = parseInt(currentIdStr);
 
-        // 1. Проверка на админа (замени на свой ID если нужно)
-        if (currentIdStr === "6793993761") { 
-            console.log("Админ зашел");
-            return; 
-        }
+        // Проверка админа (если это твой ID — окно не вылезет)
+        if (currentIdStr === "679399376") return; 
 
         let { data, error } = await _supabase
             .from('subscriptions')
@@ -1152,7 +1149,7 @@ async function askAI() {
         const now = new Date();
 
         if (!data) {
-            // Если записи нет - создаем 7 дней
+            // Если в базе пусто, создаем триал и выходим
             const trialEnd = new Date();
             trialEnd.setDate(trialEnd.getDate() + 7);
             await _supabase.from('subscriptions').insert({ 
@@ -1162,22 +1159,22 @@ async function askAI() {
             return;
         }
 
-        // ПРОВЕРКА ДАТЫ
         const expireDate = new Date(data.expires_at);
         
+        // СРАВНЕНИЕ ДАТ
         if (now > expireDate) {
-            console.log("Доступ истек, показываем окно");
-            // Показываем окно и блокируем закрытие через таймер
+            console.log("СРОК ИСТЕК");
+            // Используем таймаут, чтобы окно появилось ПОСЛЕ загрузки всех страниц
             setTimeout(() => {
                 const payModal = document.getElementById('paywall-modal');
                 if (payModal) {
                     payModal.style.setProperty('display', 'flex', 'important');
-                    payModal.style.zIndex = "20000"; // Выше всех модалок
+                    payModal.style.zIndex = "999999"; // Максимальный приоритет
                 }
-            }, 500); // Задержка, чтобы страница успела загрузиться
+            }, 1000); 
         }
     } catch (e) {
-        console.error("Ошибка подписки:", e);
+        console.error("Ошибка:", e);
     }
 }
 
@@ -1391,6 +1388,8 @@ async function editGoalName() {
     </script>
 </body>
 </html>
+
+
 
 
 
