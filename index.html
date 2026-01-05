@@ -1202,9 +1202,9 @@ async function askAI() {
         // 1. Настройка дат
         const today = new Date().toISOString().split('T')[0];
         const datePicker = document.getElementById('date-picker');
-        if(datePicker) datePicker.value = today;
         const taskDate = document.getElementById('task-date');
-        if(taskDate) taskDate.value = today;
+        if (datePicker) datePicker.value = today;
+        if (taskDate) taskDate.value = today;
 
         // 2. Инициализация Telegram
         if (window.tg) {
@@ -1212,182 +1212,178 @@ async function askAI() {
             tg.ready();
         }
 
-        // 3. Мгновенный запуск интерфейса (чтобы не было черного экрана)
-        if(typeof renderGoals === 'function') renderGoals();
-        if(typeof setMode === 'function') setMode('exp');
-        
-        // ВАЖНО: Открываем домашнюю страницу
-        if(typeof go === 'function') {
-            go('home'); 
-        } else {
-            // Если функция go еще не прогрузилась (резерв)
-            document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
-            document.getElementById('home').classList.add('active');
-        }
-
-        // 4. Фоновые задачи (база данных)
+        // 3. ФУНКЦИИ БЕЗОПАСНОСТИ И ДАННЫХ
         try {
-            if(typeof getRates === 'function') getRates();
-            if(typeof loadNotebook === 'function') loadNotebook();
-            
-            // Проверяем подписку и грузим облако
+            // Сначала проверяем подписку
             await checkSubscription();
-            if(typeof syncFromCloud === 'function') syncFromCloud();
-            if(typeof syncNotebookFromCloud === 'function') syncNotebookFromCloud();
+            
+            // Затем загружаем все данные из облака
+            if (typeof syncFromCloud === 'function') await syncFromCloud();
+            if (typeof loadNotebook === 'function') loadNotebook();
+            if (typeof syncNotebookFromCloud === 'function') await syncNotebookFromCloud();
             
         } catch (e) {
-            console.error("Фоновая ошибка:", e);
+            console.error("Ошибка при загрузке данных:", e);
+        }
+
+        // 4. ЗАПУСК ИНТЕРФЕЙСА
+        if (typeof renderGoals === 'function') renderGoals();
+        if (typeof setMode === 'function') setMode('exp');
+        if (typeof getRates === 'function') getRates();
+        
+        // ВАЖНО: Открываем домашнюю страницу в самом конце
+        if (typeof go === 'function') {
+            go('home'); 
+        } else {
+            document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+            const homePage = document.getElementById('home');
+            if (homePage) homePage.classList.add('active');
         }
     };
 
-function setMode(m) { mode = m; currentCat = cats[m][0].i; renderCats(); document.getElementById('btn-exp').style.background = m === 'exp' ? 'var(--blue)' : 'transparent'; document.getElementById('btn-inc').style.background = m === 'inc' ? 'var(--blue)' : 'transparent'; }
-        function toggleBlur() { document.getElementById('bal').classList.toggle('blurred'); tg.HapticFeedback.impactOccurred('light'); }
-        function openEdit(id) { editingId = id; const item = db.find(x => x.id === id); document.getElementById('edit-sum').value = item.s; document.getElementById('edit-note').value = item.n; document.getElementById('edit-modal').style.display = 'flex'; }
-        function closeModal() { document.getElementById('edit-modal').style.display = 'none'; }
-        async function confirmEdit() { const item = db.find(x => x.id === editingId); item.s = parseFloat(document.getElementById('edit-sum').value); item.n = document.getElementById('edit-note').value; updateUI(); closeModal(); await cloudSave(); }
-        async function deleteTransaction() { db = db.filter(x => x.id !== editingId); updateUI(); closeModal(); await cloudSave(); }
+    // --- ФУНКЦИИ УПРАВЛЕНИЯ ---
+    function setMode(m) { 
+        mode = m; 
+        currentCat = cats[m][0].i; 
+        renderCats(); 
+        document.getElementById('btn-exp').style.background = m === 'exp' ? 'var(--blue)' : 'transparent'; 
+        document.getElementById('btn-inc').style.background = m === 'inc' ? 'var(--blue)' : 'transparent'; 
+    }
 
-        async function getRates() {
-            try {
-                const btc = await (await fetch('https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd')).json();
-                document.getElementById('btc-rate').innerText = '$' + btc.bitcoin.usd.toLocaleString();
-                const rub = await (await fetch('https://api.exchangerate-api.com/v4/latest/USD')).json();
-                document.getElementById('usd-rate').innerText = rub.rates.RUB.toFixed(2) + '₽';
-            } catch(e) {}
+    function toggleBlur() { 
+        document.getElementById('bal').classList.toggle('blurred'); 
+        if(window.tg) tg.HapticFeedback.impactOccurred('light'); 
+    }
+
+    function openEdit(id) { 
+        editingId = id; 
+        const item = db.find(x => x.id === id); 
+        if (item) {
+            document.getElementById('edit-sum').value = item.s; 
+            document.getElementById('edit-note').value = item.n; 
+            document.getElementById('edit-modal').style.display = 'flex'; 
         }
-
-        // ГЛАВНАЯ ФУНКЦИЯ СОХРАНЕНИЯ В ОБЛАКО
-async function syncNotebookToCloud() {
-    try {
-        // Собираем все данные в один объект
-        const dataToSave = { 
-            tasks: typeof tasks !== 'undefined' ? tasks : [], 
-            habits: typeof habits !== 'undefined' ? habits : [], 
-            notes: typeof notes !== 'undefined' ? notes : [], 
-            goals_list: typeof goals_list !== 'undefined' ? goals_list : [] // Сохраняем цели!
-        };
-        
-        // Отправляем в Supabase (убедись, что userId определен)
-        const { error } = await _supabase.from('notebook').upsert({ 
-            id: userId, 
-            data: dataToSave, 
-            updated_at: new Date().toISOString() 
-        });
-
-        if (error) throw error;
-        console.log("Данные блокнота сохранены в облако");
-    } catch (e) {
-        console.error("Ошибка сохранения в облако:", e);
     }
-}
 
-// ФУНКЦИЯ ЗАГРУЗКИ ИЗ ОБЛАКА
-async function syncNotebookFromCloud() {
-    try {
-        const { data, error } = await _supabase.from('notebook').select('data').eq('id', userId).single();
-        
-        if (error && error.code !== 'PGRST116') throw error; // Игнорируем ошибку, если записи еще нет
+    function closeModal() { document.getElementById('edit-modal').style.display = 'none'; }
 
-        if (data && data.data) {
-            tasks = data.data.tasks || [];
-            habits = data.data.habits || [];
-            notes = data.data.notes || [];
-            goals_list = data.data.goals_list || []; // Загружаем цели!
-            
-            // Сохраняем в локальную память и обновляем экран
-            saveNotebook(); 
-            if (typeof renderTasks === 'function') renderTasks();
-            if (typeof renderHabits === 'function') renderHabits();
-            if (typeof renderNotes === 'function') renderNotes();
-            if (typeof renderGoals === 'function') renderGoals();
-            console.log("Данные из облака загружены");
+    async function confirmEdit() { 
+        const item = db.find(x => x.id === editingId); 
+        if (item) {
+            item.s = parseFloat(document.getElementById('edit-sum').value); 
+            item.n = document.getElementById('edit-note').value; 
+            updateUI(); 
+            closeModal(); 
+            if (typeof cloudSave === 'function') await cloudSave(); 
         }
-    } catch (e) {
-        console.error("Ошибка загрузки из облака:", e);
-    }
-}
-
-       window.onload = async () => { 
-    // Установка дат
-    document.getElementById('date-picker').value = new Date().toISOString().split('T')[0];
-    document.getElementById('task-date').value = new Date().toISOString().split('T')[0];
-    
-    // Инициализация Telegram
-    if (window.tg) {
-        tg.expand();
-        tg.ready();
     }
 
-    // 1. ПРОВЕРКА ПОДПИСКИ (важно сделать до отрисовки интерфейса)
-    await checkSubscription();
-
-    // 2. ЗАГРУЗКА ДАННЫХ
-    await syncFromCloud(); 
-    loadNotebook(); 
-    await syncNotebookFromCloud(); 
-
-    // 3. ОТРИСОВКА ИНТЕРФЕЙСА
-    getRates();
-    setMode('exp'); // Отрисовываем категории на главной
-    renderGoals(); 
-    go('home'); // Открываем главную страницу
-};
-
-// Открыть модальное окно управления целью
-function openGoalAction(id) {
-    selectedGoalId = id.toString();
-    const goal = goals_list.find(g => g.id === selectedGoalId);
-    if (goal) {
-        document.getElementById('modal-goal-title').innerText = goal.title;
-        document.getElementById('goal-action-modal').style.display = 'flex';
-        if(window.tg) tg.HapticFeedback.impactOccurred('medium');
+    async function deleteTransaction() { 
+        db = db.filter(x => x.id !== editingId); 
+        updateUI(); 
+        closeModal(); 
+        if (typeof cloudSave === 'function') await cloudSave(); 
     }
-}
 
-// Закрыть окно
-function closeGoalActionModal() {
-    document.getElementById('goal-action-modal').style.display = 'none';
-    document.getElementById('add-goal-money').value = '';
-}
+    async function getRates() {
+        try {
+            const btc = await (await fetch('https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd')).json();
+            document.getElementById('btc-rate').innerText = '$' + btc.bitcoin.usd.toLocaleString();
+            const rub = await (await fetch('https://api.exchangerate-api.com/v4/latest/USD')).json();
+            document.getElementById('usd-rate').innerText = rub.rates.RUB.toFixed(2) + '₽';
+        } catch(e) {}
+    }
 
-// Внести деньги
-async function addMoneyToGoal() {
-    const input = document.getElementById('add-goal-money');
-    const val = parseFloat(input.value);
-    if (!val || val <= 0) return;
+    // --- СИНХРОНИЗАЦИЯ БЛОКНОТА ---
+    async function syncNotebookToCloud() {
+        try {
+            const dataToSave = { 
+                tasks: typeof tasks !== 'undefined' ? tasks : [], 
+                habits: typeof habits !== 'undefined' ? habits : [], 
+                notes: typeof notes !== 'undefined' ? notes : [], 
+                goals_list: typeof goals_list !== 'undefined' ? goals_list : [] 
+            };
+            const { error } = await _supabase.from('notebook').upsert({ 
+                id: userId, 
+                data: dataToSave, 
+                updated_at: new Date().toISOString() 
+            });
+            if (error) throw error;
+            console.log("Данные сохранены");
+        } catch (e) { console.error("Ошибка сохранения:", e); }
+    }
 
-    const goal = goals_list.find(g => g.id === selectedGoalId);
-    if (goal) {
-        goal.current += val;
+    async function syncNotebookFromCloud() {
+        try {
+            const { data, error } = await _supabase.from('notebook').select('data').eq('id', userId).single();
+            if (error && error.code !== 'PGRST116') throw error;
+            if (data && data.data) {
+                tasks = data.data.tasks || [];
+                habits = data.data.habits || [];
+                notes = data.data.notes || [];
+                goals_list = data.data.goals_list || [];
+                saveNotebook(); 
+                if (typeof renderTasks === 'function') renderTasks();
+                if (typeof renderHabits === 'function') renderHabits();
+                if (typeof renderNotes === 'function') renderNotes();
+                if (typeof renderGoals === 'function') renderGoals();
+            }
+        } catch (e) { console.error("Ошибка загрузки:", e); }
+    }
+
+    // --- УПРАВЛЕНИЕ ЦЕЛЯМИ ---
+    function openGoalAction(id) {
+        selectedGoalId = id.toString();
+        const goal = goals_list.find(g => g.id === selectedGoalId);
+        if (goal) {
+            document.getElementById('modal-goal-title').innerText = goal.title;
+            document.getElementById('goal-action-modal').style.display = 'flex';
+            if(window.tg) tg.HapticFeedback.impactOccurred('medium');
+        }
+    }
+
+    function closeGoalActionModal() {
+        document.getElementById('goal-action-modal').style.display = 'none';
+        document.getElementById('add-goal-money').value = '';
+    }
+
+    async function addMoneyToGoal() {
+        const input = document.getElementById('add-goal-money');
+        const val = parseFloat(input.value);
+        if (!val || val <= 0) return;
+        const goal = goals_list.find(g => g.id === selectedGoalId);
+        if (goal) {
+            goal.current += val;
+            closeGoalActionModal();
+            renderGoals();
+            await syncNotebookToCloud();
+            if(window.tg) tg.HapticFeedback.notificationOccurred('success');
+        }
+    }
+
+    async function deleteGoalReal() {
+        if (!confirm("Удалить эту цель?")) return;
+        goals_list = goals_list.filter(g => g.id !== selectedGoalId);
         closeGoalActionModal();
         renderGoals();
-        if (typeof syncNotebookToCloud === 'function') await syncNotebookToCloud();
-        if(window.tg) tg.HapticFeedback.notificationOccurred('success');
+        await syncNotebookToCloud();
     }
-}
 
-// Удалить цель
-async function deleteGoalReal() {
-    if (!confirm("Удалить эту цель?")) return;
-    goals_list = goals_list.filter(g => g.id !== selectedGoalId);
-    closeGoalActionModal();
-    renderGoals();
-    if (typeof syncNotebookToCloud === 'function') await syncNotebookToCloud();
-}
-
-// Редактировать название
-async function editGoalName() {
-    const goal = goals_list.find(g => g.id === selectedGoalId);
-    const newName = prompt("Новое название цели:", goal.title);
-    if (newName) {
-        goal.title = newName;
-        renderGoals();
-        if (typeof syncNotebookToCloud === 'function') await syncNotebookToCloud();
+    async function editGoalName() {
+        const goal = goals_list.find(g => g.id === selectedGoalId);
+        if (!goal) return;
+        const newName = prompt("Новое название цели:", goal.title);
+        if (newName) {
+            goal.title = newName;
+            renderGoals();
+            await syncNotebookToCloud();
+        }
     }
-}
     </script>
 </body>
 </html>
+
+
 
 
 
