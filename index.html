@@ -202,34 +202,32 @@
     </style>
 </head>
 <body>
-    <div id="paywall-modal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.95); z-index:10000; flex-direction:column; align-items:center; justify-content:center; text-align:center; padding:20px; color:white;">
-    <div style="background:var(--card); padding:30px; border-radius:24px; border:1px solid var(--border); width:100%; max-width:320px;">
-        <div style="font-size:50px; margin-bottom:10px;">⭐</div>
-        <h2 style="margin-bottom:10px;">Пробный период истёк</h2>
-        <p style="color:var(--text); margin-bottom:25px; font-size:14px;">Ваши первые 7 дней закончились. Чтобы продолжить пользоваться НейроСчётом, активируйте подписку.</p>
-        
-        <div style="background:rgba(255,255,255,0.05); padding:15px; border-radius:15px; margin-bottom:25px;">
-            <span style="display:block; font-size:12px; color:var(--text); text-transform:uppercase;">Цена за 30 дней</span>
-            <span style="font-size:24px; font-weight:bold;">100 Stars</span>
+    
+<div id="paywall-modal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.95); z-index:10000; flex-direction:column; align-items:center; justify-content:center; text-align:center; padding:20px; color:white;">
+        <div style="background:var(--card); padding:30px; border-radius:24px; border:1px solid var(--border); width:100%; max-width:320px;">
+            <div style="font-size:50px; margin-bottom:10px;">⭐</div>
+            <h2 style="margin-bottom:10px;">Пробный период истёк</h2>
+            <p style="color:var(--text); margin-bottom:25px; font-size:14px;">Ваши первые 7 дней закончились. Чтобы продолжить пользоваться НейроСчётом, активируйте подписку.</p>
+            <div style="background:rgba(255,255,255,0.05); padding:15px; border-radius:15px; margin-bottom:25px;">
+                <span style="display:block; font-size:12px; color:var(--text); text-transform:uppercase;">Цена за 30 дней</span>
+                <span style="font-size:24px; font-weight:bold;">100 Stars</span>
+            </div>
+            <div id="pay-status" style="margin-bottom:15px; color:var(--blue); font-size:14px;"></div>
+            <button onclick="buySubscription()" style="background:var(--blue); color:white; border:none; padding:16px; border-radius:16px; font-weight:bold; width:100%; font-size:16px; box-shadow: 0 4px 15px rgba(10, 132, 255, 0.3);">
+                Оплатить ⭐ 100
+            </button>
         </div>
-
-        <div id="pay-status" style="margin-bottom:15px; color:var(--blue); font-size:14px;"></div>
-        
-        <button onclick="buySubscription()" style="background:var(--blue); color:white; border:none; padding:16px; border-radius:16px; font-weight:bold; width:100%; font-size:16px; box-shadow: 0 4px 15px rgba(10, 132, 255, 0.3);">
-            Оплатить ⭐ 100
-        </button>
     </div>
-</div>
 
-    <div id="edit-modal"><div class="modal-content">
-        <h3 style="text-align:center;">Редактировать</h3>
-        <input type="number" id="edit-sum" class="sum-in">
-        <input type="text" id="edit-note" class="note-in" style="margin: 15px 0;">
-        <button class="save-btn" onclick="confirmEdit()">Сохранить</button>
-        <button class="save-btn" style="background:var(--red); margin-top:10px;" onclick="deleteTransaction()">Удалить</button>
-        <button class="note-in" style="margin-top:10px; background:none;" onclick="closeModal()">Отмена</button>
-    </div></div>
-
+    <div id="edit-modal">
+        <div class="modal-content">
+            <h3 style="text-align:center;">Редактировать</h3>
+            <input type="number" id="edit-sum" class="sum-in">
+            <input type="text" id="edit-note" class="note-in" style="margin: 15px 0;">
+            <button class="save-btn" onclick="confirmEdit()">Сохранить</button>
+            <button class="save-btn" style="background:var(--red); margin-top:10px;" onclick="deleteTransaction()">Удалить</button>
+            <button class="note-in" style="margin-top:10px; background:none;" onclick="closeModal()">Отмена</button>
+        </div> </div> ```
     <div id="budget-modal"><div class="modal-content">
         <h3 style="text-align:center;">Лимит по категории</h3>
         <div class="bud-cat-select" id="bud-cat-list"></div>
@@ -1130,65 +1128,118 @@ async function askAI() {
         window.quickAdd = async (t, c, s, n) => { db.unshift({ id: Date.now(), t, c, s, n, d: new Date().toISOString().split('T')[0] }); updateUI(); await cloudSave(); go('home'); };
 
      // --- ЛОГИКА ПОДПИСКИ ---
-async function checkSubscription() {
-    try {
-        // 1. Твой ID (проверь, чтобы было 10 цифр)
-        //if (userId === "6793993761") { 
-            console.log("Доступ администратора");
-            return; 
+
+    // Функция проверки подписки
+    async function checkSubscription() {
+        try {
+            // Получаем ID заново, используя другое имя переменной, чтобы не было ошибки
+            const tgUser = window.tg?.initDataUnsafe?.user;
+            const currentIdStr = tgUser?.id?.toString() || "6793993761"; // Твой ID как резерв
+
+            // Проверка админа (твой ID)
+            if (currentIdStr === "6793993761") { 
+                console.log("Администратор: проверка пропущена");
+                return; 
+            }
+
+            const numericId = parseInt(currentIdStr);
+            if (isNaN(numericId)) return;
+
+            // Запрос к базе
+            let { data, error } = await _supabase
+                .from('subscriptions')
+                .select('*')
+                .eq('user_id', numericId)
+                .single();
+
+            const now = new Date();
+
+            // 1. Если пользователя нет — даем 7 дней бесплатно
+            if (!data) {
+                const trialEnd = new Date();
+                trialEnd.setDate(trialEnd.getDate() + 7);
+                
+                await _supabase.from('subscriptions').insert({ 
+                    user_id: numericId, 
+                    expires_at: trialEnd.toISOString() 
+                });
+                console.log("Выдан пробный период");
+                return;
+            }
+
+            // 2. Если срок вышел — показываем окно оплаты
+            const expireDate = new Date(data.expires_at);
+            if (now > expireDate) {
+                document.getElementById('paywall-modal').style.display = 'flex';
+            }
+
+        } catch (e) {
+            console.error("Ошибка подписки:", e);
         }
-
-        const numericId = parseInt(userId);
-        if (isNaN(numericId) || userId === 'user_demo') return; 
-
-        // 2. Запрос к таблице subscriptions
-        let { data, error } = await _supabase
-            .from('subscriptions')
-            .select('*')
-            .eq('user_id', numericId)
-            .single();
-
-        const now = new Date();
-
-        // 3. ЕСЛИ ПОЛЬЗОВАТЕЛЯ НЕТ — ДАРИМ 7 ДНЕЙ
-        if (!data) {
-            const trialEnd = new Date();
-            trialEnd.setDate(trialEnd.getDate() + 7);
-            
-            await _supabase.from('subscriptions').insert({ 
-                user_id: numericId, 
-                expires_at: trialEnd.toISOString() 
-            });
-            
-            console.log("Выдан пробный период на 7 дней");
-            return;
-        }
-
-        // 4. ПРОВЕРКА СРОКА (и триала, и купленной подписки)
-        const expireDate = new Date(data.expires_at);
-        if (now > expireDate) {
-            // Показываем окно оплаты, если время вышло
-            document.getElementById('paywall-modal').style.display = 'flex';
-        }
-    } catch (e) {
-        console.error("Ошибка подписки:", e);
     }
-}
 
-// ФУНКЦИЯ ПОКУПКИ ЧЕРЕЗ БОТА (Telegram Stars)
-async function buySubscription() {
-    const status = document.getElementById('pay-status');
-    if (status) status.innerText = "Переходим к оплате в боте...";
+    // Функция оплаты
+    async function buySubscription() {
+        const status = document.getElementById('pay-status');
+        if (status) status.innerText = "Открываем бота...";
 
-    setTimeout(() => {
+        const botUrl = "https://t.me/Finans_Neyro_bot?start=pay";
+
         if (window.tg) {
-            // Ссылка на твоего бота с параметром pay
-            // Бот перехватит этот параметр и сразу выдаст инвойс на 100 звезд
-            tg.openTelegramLink("https://t.me/Finans_Neyro_bot?start=pay");
-            tg.close(); // Закрываем приложение, чтобы юзер увидел чат
+            // Пробуем открыть инвойс
+            window.tg.openTelegramLink(botUrl);
+            // Закрываем приложение через секунду
+            setTimeout(() => window.tg.close(), 1000);
+        } else {
+            window.open(botUrl, '_blank');
         }
-    }, 1000);
-}
+    }
+
+    // --- ЕДИНЫЙ ЗАПУСК ПРИЛОЖЕНИЯ ---
+    window.onload = async () => {
+        console.log("App Started");
+
+        // 1. Настройка дат
+        const today = new Date().toISOString().split('T')[0];
+        const datePicker = document.getElementById('date-picker');
+        if(datePicker) datePicker.value = today;
+        const taskDate = document.getElementById('task-date');
+        if(taskDate) taskDate.value = today;
+
+        // 2. Инициализация Telegram
+        if (window.tg) {
+            tg.expand();
+            tg.ready();
+        }
+
+        // 3. Мгновенный запуск интерфейса (чтобы не было черного экрана)
+        if(typeof renderGoals === 'function') renderGoals();
+        if(typeof setMode === 'function') setMode('exp');
+        
+        // ВАЖНО: Открываем домашнюю страницу
+        if(typeof go === 'function') {
+            go('home'); 
+        } else {
+            // Если функция go еще не прогрузилась (резерв)
+            document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+            document.getElementById('home').classList.add('active');
+        }
+
+        // 4. Фоновые задачи (база данных)
+        try {
+            if(typeof getRates === 'function') getRates();
+            if(typeof loadNotebook === 'function') loadNotebook();
+            
+            // Проверяем подписку и грузим облако
+            await checkSubscription();
+            if(typeof syncFromCloud === 'function') syncFromCloud();
+            if(typeof syncNotebookFromCloud === 'function') syncNotebookFromCloud();
+            
+        } catch (e) {
+            console.error("Фоновая ошибка:", e);
+        }
+    };
+
 function setMode(m) { mode = m; currentCat = cats[m][0].i; renderCats(); document.getElementById('btn-exp').style.background = m === 'exp' ? 'var(--blue)' : 'transparent'; document.getElementById('btn-inc').style.background = m === 'inc' ? 'var(--blue)' : 'transparent'; }
         function toggleBlur() { document.getElementById('bal').classList.toggle('blurred'); tg.HapticFeedback.impactOccurred('light'); }
         function openEdit(id) { editingId = id; const item = db.find(x => x.id === id); document.getElementById('edit-sum').value = item.s; document.getElementById('edit-note').value = item.n; document.getElementById('edit-modal').style.display = 'flex'; }
@@ -1337,6 +1388,7 @@ async function editGoalName() {
     </script>
 </body>
 </html>
+
 
 
 
