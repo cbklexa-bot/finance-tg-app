@@ -1,5 +1,2 @@
 pyTelegramBotAPI
 supabase
-flask
-flask-cors
-requests
