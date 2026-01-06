@@ -1133,48 +1133,48 @@ async function askAI() {
    async function checkSubscription() {
     try {
         const tgUser = window.tg?.initDataUnsafe?.user;
-        // УБЕДИСЬ, ЧТО ЭТОТ ID СОВПАДАЕТ С ID В ТАБЛИЦЕ SUPABASE
-        const currentIdStr = tgUser?.id?.toString() || "6793993761"; 
+        // Исправленный ID (убрал лишнюю "1" в конце)
+        const currentIdStr = tgUser?.id?.toString() || "679399376"; 
         const numericId = parseInt(currentIdStr);
 
-        // Проверка админа (если это твой ID — окно не вылезет)
-        if (currentIdStr === "679399376") return; 
-
-        let { data, error } = await _supabase
-            .from('subscriptions')
-            .select('*')
-            .eq('user_id', numericId)
-            .single();
-
-        const now = new Date();
-
-        if (!data) {
-            // Если в базе пусто, создаем триал и выходим
-            const trialEnd = new Date();
-            trialEnd.setDate(trialEnd.getDate() + 7);
-            await _supabase.from('subscriptions').insert({ 
-                user_id: numericId, 
-                expires_at: trialEnd.toISOString() 
-            });
+        // Игнорируем админа
+        if (currentIdStr === "679399376") {
+            const payModal = document.getElementById('paywall-modal');
+            if (payModal) payModal.style.display = 'none';
             return;
         }
 
-        const expireDate = new Date(data.expires_at);
-        
-        // СРАВНЕНИЕ ДАТ
-        if (now > expireDate) {
-            console.log("СРОК ИСТЕК");
-            // Используем таймаут, чтобы окно появилось ПОСЛЕ загрузки всех страниц
-            setTimeout(() => {
-                const payModal = document.getElementById('paywall-modal');
+        const { data, error } = await _supabase
+            .from('subscriptions')
+            .select('expires_at')
+            .eq('user_id', numericId)
+            .maybeSingle();
+
+        const now = new Date();
+        const payModal = document.getElementById('paywall-modal');
+
+        // ЕСЛИ ПОЛЬЗОВАТЕЛЬ НАЙДЕН
+        if (data && data.expires_at) {
+            const expireDate = new Date(data.expires_at);
+            if (now < expireDate) {
                 if (payModal) {
-                    payModal.style.setProperty('display', 'flex', 'important');
-                    payModal.style.zIndex = "999999"; // Максимальный приоритет
+                    payModal.style.display = 'none';
+                    payModal.style.setProperty('display', 'none', 'important');
                 }
-            }, 1000); 
+                console.log("Доступ разрешен до:", expireDate);
+                return;
+            }
         }
+
+        // ЕСЛИ ПОЛЬЗОВАТЕЛЬ НЕ НАЙДЕН ИЛИ ПОДПИСКА ИСТЕКЛА
+        // (Убрал авто-создание триала, чтобы не плодить ID с +7 дней)
+        if (payModal) {
+            payModal.style.display = 'flex';
+            payModal.style.setProperty('display', 'flex', 'important');
+        }
+        
     } catch (e) {
-        console.error("Ошибка:", e);
+        console.error("Ошибка проверки:", e);
     }
 }
 
@@ -1388,6 +1388,7 @@ async function editGoalName() {
     </script>
 </body>
 </html>
+
 
 
 
