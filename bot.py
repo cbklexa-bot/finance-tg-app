@@ -1,69 +1,46 @@
 import os
 import telebot
 import threading
-import requests
-import time
-from flask import Flask, request, Response
-from flask_cors import CORS
+import http.server
+import socketserver
 from supabase import create_client, Client
 from datetime import datetime, timedelta
 
-# --- НАСТРОЙКИ ---
-TOKEN = os.environ.get('BOT_TOKEN')
-URL = "https://ereiiidezagburttpxtn.supabase.co"
-KEY = os.environ.get('SUPABASE_KEY')
+# --- БЛОК ДЛЯ СТАБИЛЬНОЙ РАБОТЫ НА RENDER (Health Check) ---
+def run_health_server():
+    handler = http.server.SimpleHTTPRequestHandler
+    port = int(os.environ.get("PORT", 10000))
+    with socketserver.TCPServer(("", port), handler) as httpd:
+        print(f"Health check server running on port {port}")
+        httpd.serve_forever()
 
-app = Flask(__name__)
-CORS(app)
+threading.Thread(target=run_health_server, daemon=True).start()
+# -----------------------------------------------------------
+
+# Загрузка ключей из переменных окружения Render
+TOKEN = os.environ.get('BOT_TOKEN')
+URL = os.environ.get('SUPABASE_URL')
+KEY = os.environ.get('SUPABASE_KEY')
 
 bot = telebot.TeleBot(TOKEN)
 supabase: Client = create_client(URL, KEY)
 
-# --- ПРОКСИ-СЕРВЕР ---
-@app.route('/proxy/<path:url>', methods=['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'])
-def supabase_proxy(url):
-    target_url = f"{URL}/{url}"
-    headers = {k: v for k, v in request.headers if k.lower() != 'host'}
-    try:
-        resp = requests.request(
-            method=request.method,
-            url=target_url,
-            headers=headers,
-            data=request.get_data(),
-            params=request.args,
-            timeout=10
-        )
-        excluded_headers = ['content-encoding', 'transfer-encoding', 'content-length', 'connection']
-        proxy_headers = [(k, v) for k, v in resp.headers.items() if k.lower() not in excluded_headers]
-        return Response(resp.content, resp.status_code, proxy_headers)
-    except Exception as e:
-        return {"error": str(e)}, 500
-
-@app.route('/')
-def health():
-    return "Proxy and Bot are running", 200
-
-def run_flask():
-    port = int(os.environ.get("PORT", 10000))
-    # Threaded=True позволяет Flask обрабатывать несколько запросов одновременно
-    app.run(host='0.0.0.0', port=port, threaded=True)
-
-# --- ЛОГИКА БОТА ---
 @bot.message_handler(commands=['start'])
 def start(message):
+    # Проверяем, пришел ли пользователь из приложения по ссылке ?start=pay
     if "pay" in message.text:
         bot.send_invoice(
             message.chat.id,
             title="НейроСчет: Подписка",
-            description="Доступ на 30 дней",
+            description="Доступ к функциям НейроСчет на 30 дней",
             invoice_payload="month_sub",
-            provider_token="", 
-            currency="XTR",
-            prices=[telebot.types.LabeledPrice(label="Активировать", amount=100)],
+            provider_token="", # Для Telegram Stars всегда пусто
+            currency="XTR",    # Валюта: Telegram Stars
+            prices=[telebot.types.LabeledPrice(label="Активировать НейроСчет", amount=100)], # 100 звезд ≈ 199 руб
             start_parameter="pay"
         )
     else:
-        bot.send_message(message.chat.id, "Добро пожаловать в НейроСчет! Откройте приложение.")
+        bot.send_message(message.chat.id, "Добро пожаловать в НейроСчет! Используйте Mini App для управления финансами.")
 
 @bot.pre_checkout_query_handler(func=lambda query: True)
 def checkout(query):
@@ -72,22 +49,20 @@ def checkout(query):
 @bot.message_handler(content_types=['successful_payment'])
 def success(message):
     user_id = message.from_user.id
+    # Рассчитываем новую дату (текущая дата + 30 дней)
     new_date = (datetime.now() + timedelta(days=30)).isoformat()
+    
     try:
-        supabase.table("subscriptions").upsert({"user_id": user_id, "expires_at": new_date}).execute()
-        bot.send_message(message.chat.id, "✅ Оплата прошла! Доступ продлен.")
+        # Автоматическое обновление подписки в Supabase
+        supabase.table("subscriptions").upsert({
+            "user_id": user_id, 
+            "expires_at": new_date
+        }).execute()
+        
+        bot.send_message(message.chat.id, "✅ Оплата прошла успешно! Ваш доступ к НейроСчет продлен на 30 дней. Перезапустите приложение.")
     except Exception as e:
-        bot.send_message(message.chat.id, f"⚠️ Ошибка базы: {e}")
+        print(f"Ошибка Supabase: {e}")
+        bot.send_message(message.chat.id, "⚠️ Оплата прошла, но возникла ошибка при обновлении базы. Пожалуйста, напишите в поддержку.")
 
-if __name__ == "__main__":
-    # 1. Запускаем веб-сервер в отдельном потоке
-    threading.Thread(target=run_flask, daemon=True).start()
-    
-    # 2. Очищаем старые подключения (лечит ошибку 409)
-    bot.remove_webhook()
-    time.sleep(1)
-    
-    print("Система запущена (Proxy + Bot)...")
-    
-    # 3. Запускаем бота в основном потоке (infinity_polling лучше для Render)
-    bot.infinity_polling(skip_pending=True)
+print("Бот НейроСчет запущен и готов к работе...")
+bot.polling(none_stop=True)
