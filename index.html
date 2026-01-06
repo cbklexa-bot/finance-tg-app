@@ -400,10 +400,8 @@
 
     <script>
         const tg = window.Telegram.WebApp;
-// Используем твой сервер на Render как прокси-мост
-const supabaseUrl = 'https://finance-tg-app.onrender.com/proxy'; 
-const supabaseKey = 'sb_publishable_YuQ8s49c1LvkCTmoBPQ0hA_7EJ3Z1cj';
-const _supabase = supabase.createClient(supabaseUrl, supabaseKey);
+        const { createClient } = supabase;
+        const _supabase = createClient('https://ereiiidezagburttpxtn.supabase.co', 'sb_publishable_YuQ8s49c1LvkCTmoBPQ0hA_7EJ3Z1cj');
         
        let userId = tg.initDataUnsafe?.user?.id?.toString() || 'user_demo';
         let db = [];
@@ -1135,49 +1133,57 @@ async function askAI() {
    async function checkSubscription() {
     try {
         const tgUser = window.tg?.initDataUnsafe?.user;
-        // Твой реальный ID без лишних цифр
-        const currentIdStr = tgUser?.id?.toString()  
+        // УБЕДИСЬ, ЧТО ЭТОТ ID СОВПАДАЕТ С ID В ТАБЛИЦЕ SUPABASE
+        const currentIdStr = tgUser?.id?.toString() || "6793993761"; 
         const numericId = parseInt(currentIdStr);
 
-        // Запрос идет через прокси-клиент _supabase
-        const { data, error } = await _supabase
-            .from('subscriptions')
-            .select('expires_at')
-            .eq('user_id', numericId)
-            .maybeSingle();
+        // Проверка админа (если это твой ID — окно не вылезет)
+        if (currentIdStr === "679399376") return; 
 
-        const payModal = document.getElementById('paywall-modal');
+        let { data, error } = await _supabase
+            .from('subscriptions')
+            .select('*')
+            .eq('user_id', numericId)
+            .single();
+
         const now = new Date();
 
-        if (data && data.expires_at) {
-            const expireDate = new Date(data.expires_at);
-            if (now < expireDate) {
-                // Если оплачено — ПРИНУДИТЕЛЬНО скрываем окно
-                if (payModal) {
-                    payModal.style.display = 'none';
-                    payModal.style.setProperty('display', 'none', 'important');
-                }
-                console.log("Доступ разрешен до:", expireDate);
-                return;
-            }
-        }
-        
-        // Если оплаты нет или срок вышел — показываем окно
-        if (payModal) {
-            payModal.style.display = 'flex';
-            payModal.style.setProperty('display', 'flex', 'important');
+        if (!data) {
+            // Если в базе пусто, создаем триал и выходим
+            const trialEnd = new Date();
+            trialEnd.setDate(trialEnd.getDate() + 7);
+            await _supabase.from('subscriptions').insert({ 
+                user_id: numericId, 
+                expires_at: trialEnd.toISOString() 
+            });
+            return;
         }
 
+        const expireDate = new Date(data.expires_at);
+        
+        // СРАВНЕНИЕ ДАТ
+        if (now > expireDate) {
+            console.log("СРОК ИСТЕК");
+            // Используем таймаут, чтобы окно появилось ПОСЛЕ загрузки всех страниц
+            setTimeout(() => {
+                const payModal = document.getElementById('paywall-modal');
+                if (payModal) {
+                    payModal.style.setProperty('display', 'flex', 'important');
+                    payModal.style.zIndex = "999999"; // Максимальный приоритет
+                }
+            }, 1000); 
+        }
     } catch (e) {
-        console.error("Ошибка связи с прокси-сервером:", e);
+        console.error("Ошибка:", e);
     }
 }
+
     // Функция оплаты
     async function buySubscription() {
         const status = document.getElementById('pay-status');
         if (status) status.innerText = "Открываем бота...";
 
-        const botUrl = "https://t.me/Finance_AI_Bot?start=pay";
+        const botUrl = "https://t.me/Finans_Neyro_bot?start=pay";
 
         if (window.tg) {
             // Пробуем открыть инвойс
@@ -1189,192 +1195,196 @@ async function askAI() {
         }
     }
 
-   // --- ЕДИНЫЙ ЗАПУСК ПРИЛОЖЕНИЯ ---
-   window.onload = async () => {
-    console.log("App Started");
+    // --- ЕДИНЫЙ ЗАПУСК ПРИЛОЖЕНИЯ ---
+    window.onload = async () => {
+        console.log("App Started");
 
-    // 1. Настройка дат
-    const today = new Date().toISOString().split('T')[0];
-    const datePicker = document.getElementById('date-picker');
-    const taskDate = document.getElementById('task-date');
-    if (datePicker) datePicker.value = today;
-    if (taskDate) taskDate.value = today;
+        // 1. Настройка дат
+        const today = new Date().toISOString().split('T')[0];
+        const datePicker = document.getElementById('date-picker');
+        if(datePicker) datePicker.value = today;
+        const taskDate = document.getElementById('task-date');
+        if(taskDate) taskDate.value = today;
 
-    // 2. Инициализация Telegram
+        // 2. Инициализация Telegram
+        if (window.tg) {
+            tg.expand();
+            tg.ready();
+        }
+
+        // 3. Мгновенный запуск интерфейса (чтобы не было черного экрана)
+        if(typeof renderGoals === 'function') renderGoals();
+        if(typeof setMode === 'function') setMode('exp');
+        
+        // ВАЖНО: Открываем домашнюю страницу
+        if(typeof go === 'function') {
+            go('home'); 
+        } else {
+            // Если функция go еще не прогрузилась (резерв)
+            document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+            document.getElementById('home').classList.add('active');
+        }
+
+        // 4. Фоновые задачи (база данных)
+        try {
+            if(typeof getRates === 'function') getRates();
+            if(typeof loadNotebook === 'function') loadNotebook();
+            
+            // Проверяем подписку и грузим облако
+            await checkSubscription();
+            if(typeof syncFromCloud === 'function') syncFromCloud();
+            if(typeof syncNotebookFromCloud === 'function') syncNotebookFromCloud();
+            
+        } catch (e) {
+            console.error("Фоновая ошибка:", e);
+        }
+    };
+
+function setMode(m) { mode = m; currentCat = cats[m][0].i; renderCats(); document.getElementById('btn-exp').style.background = m === 'exp' ? 'var(--blue)' : 'transparent'; document.getElementById('btn-inc').style.background = m === 'inc' ? 'var(--blue)' : 'transparent'; }
+        function toggleBlur() { document.getElementById('bal').classList.toggle('blurred'); tg.HapticFeedback.impactOccurred('light'); }
+        function openEdit(id) { editingId = id; const item = db.find(x => x.id === id); document.getElementById('edit-sum').value = item.s; document.getElementById('edit-note').value = item.n; document.getElementById('edit-modal').style.display = 'flex'; }
+        function closeModal() { document.getElementById('edit-modal').style.display = 'none'; }
+        async function confirmEdit() { const item = db.find(x => x.id === editingId); item.s = parseFloat(document.getElementById('edit-sum').value); item.n = document.getElementById('edit-note').value; updateUI(); closeModal(); await cloudSave(); }
+        async function deleteTransaction() { db = db.filter(x => x.id !== editingId); updateUI(); closeModal(); await cloudSave(); }
+
+        async function getRates() {
+            try {
+                const btc = await (await fetch('https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd')).json();
+                document.getElementById('btc-rate').innerText = '$' + btc.bitcoin.usd.toLocaleString();
+                const rub = await (await fetch('https://api.exchangerate-api.com/v4/latest/USD')).json();
+                document.getElementById('usd-rate').innerText = rub.rates.RUB.toFixed(2) + '₽';
+            } catch(e) {}
+        }
+
+        // ГЛАВНАЯ ФУНКЦИЯ СОХРАНЕНИЯ В ОБЛАКО
+async function syncNotebookToCloud() {
+    try {
+        // Собираем все данные в один объект
+        const dataToSave = { 
+            tasks: typeof tasks !== 'undefined' ? tasks : [], 
+            habits: typeof habits !== 'undefined' ? habits : [], 
+            notes: typeof notes !== 'undefined' ? notes : [], 
+            goals_list: typeof goals_list !== 'undefined' ? goals_list : [] // Сохраняем цели!
+        };
+        
+        // Отправляем в Supabase (убедись, что userId определен)
+        const { error } = await _supabase.from('notebook').upsert({ 
+            id: userId, 
+            data: dataToSave, 
+            updated_at: new Date().toISOString() 
+        });
+
+        if (error) throw error;
+        console.log("Данные блокнота сохранены в облако");
+    } catch (e) {
+        console.error("Ошибка сохранения в облако:", e);
+    }
+}
+
+// ФУНКЦИЯ ЗАГРУЗКИ ИЗ ОБЛАКА
+async function syncNotebookFromCloud() {
+    try {
+        const { data, error } = await _supabase.from('notebook').select('data').eq('id', userId).single();
+        
+        if (error && error.code !== 'PGRST116') throw error; // Игнорируем ошибку, если записи еще нет
+
+        if (data && data.data) {
+            tasks = data.data.tasks || [];
+            habits = data.data.habits || [];
+            notes = data.data.notes || [];
+            goals_list = data.data.goals_list || []; // Загружаем цели!
+            
+            // Сохраняем в локальную память и обновляем экран
+            saveNotebook(); 
+            if (typeof renderTasks === 'function') renderTasks();
+            if (typeof renderHabits === 'function') renderHabits();
+            if (typeof renderNotes === 'function') renderNotes();
+            if (typeof renderGoals === 'function') renderGoals();
+            console.log("Данные из облака загружены");
+        }
+    } catch (e) {
+        console.error("Ошибка загрузки из облака:", e);
+    }
+}
+
+       window.onload = async () => { 
+    // Установка дат
+    document.getElementById('date-picker').value = new Date().toISOString().split('T')[0];
+    document.getElementById('task-date').value = new Date().toISOString().split('T')[0];
+    
+    // Инициализация Telegram
     if (window.tg) {
         tg.expand();
         tg.ready();
     }
 
-    // 3. СИНХРОНИЗАЦИЯ И ЖЕСТКАЯ ПРОВЕРКА
-    try {
-        // Сначала тянем данные из облака (транзакции и блокнот)
-        if (typeof syncFromCloud === 'function') await syncFromCloud();
-        if (typeof syncNotebookFromCloud === 'function') await syncNotebookFromCloud();
-        
-        console.log("Data synced. Checking subscription...");
+    // 1. ПРОВЕРКА ПОДПИСКИ (важно сделать до отрисовки интерфейса)
+    await checkSubscription();
 
-        // ЖДЕМ завершения проверки подписки перед тем как рисовать интерфейс
-        await checkSubscription(); 
+    // 2. ЗАГРУЗКА ДАННЫХ
+    await syncFromCloud(); 
+    loadNotebook(); 
+    await syncNotebookFromCloud(); 
 
-    } catch (e) {
-        console.error("Initialization error:", e);
-        // Если база недоступна, проверяем локально
-        await checkSubscription();
-    }
-
-    // 4. ЗАПУСК ИНТЕРФЕЙСА (только после проверки выше)
-    if (typeof renderGoals === 'function') renderGoals();
-    if (typeof setMode === 'function') setMode('exp');
-    if (typeof getRates === 'function') getRates();
-    
-    // Открываем домашнюю страницу
-    if (typeof go === 'function') {
-        go('home'); 
-    } else {
-        document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
-        const homePage = document.getElementById('home');
-        if (homePage) homePage.classList.add('active');
-    }
+    // 3. ОТРИСОВКА ИНТЕРФЕЙСА
+    getRates();
+    setMode('exp'); // Отрисовываем категории на главной
+    renderGoals(); 
+    go('home'); // Открываем главную страницу
 };
 
-    // --- ФУНКЦИИ УПРАВЛЕНИЯ ---
-    function setMode(m) { 
-        mode = m; 
-        currentCat = cats[m][0].i; 
-        renderCats(); 
-        document.getElementById('btn-exp').style.background = m === 'exp' ? 'var(--blue)' : 'transparent'; 
-        document.getElementById('btn-inc').style.background = m === 'inc' ? 'var(--blue)' : 'transparent'; 
+// Открыть модальное окно управления целью
+function openGoalAction(id) {
+    selectedGoalId = id.toString();
+    const goal = goals_list.find(g => g.id === selectedGoalId);
+    if (goal) {
+        document.getElementById('modal-goal-title').innerText = goal.title;
+        document.getElementById('goal-action-modal').style.display = 'flex';
+        if(window.tg) tg.HapticFeedback.impactOccurred('medium');
     }
+}
 
-    function toggleBlur() { 
-        document.getElementById('bal').classList.toggle('blurred'); 
-        if(window.tg) tg.HapticFeedback.impactOccurred('light'); 
-    }
+// Закрыть окно
+function closeGoalActionModal() {
+    document.getElementById('goal-action-modal').style.display = 'none';
+    document.getElementById('add-goal-money').value = '';
+}
 
-    function openEdit(id) { 
-        editingId = id; 
-        const item = db.find(x => x.id === id); 
-        if (item) {
-            document.getElementById('edit-sum').value = item.s; 
-            document.getElementById('edit-note').value = item.n; 
-            document.getElementById('edit-modal').style.display = 'flex'; 
-        }
-    }
+// Внести деньги
+async function addMoneyToGoal() {
+    const input = document.getElementById('add-goal-money');
+    const val = parseFloat(input.value);
+    if (!val || val <= 0) return;
 
-    function closeModal() { document.getElementById('edit-modal').style.display = 'none'; }
-
-    async function confirmEdit() { 
-        const item = db.find(x => x.id === editingId); 
-        if (item) {
-            item.s = parseFloat(document.getElementById('edit-sum').value); 
-            item.n = document.getElementById('edit-note').value; 
-            updateUI(); 
-            closeModal(); 
-            if (typeof cloudSave === 'function') await cloudSave(); 
-        }
-    }
-
-    async function deleteTransaction() { 
-        db = db.filter(x => x.id !== editingId); 
-        updateUI(); 
-        closeModal(); 
-        if (typeof cloudSave === 'function') await cloudSave(); 
-    }
-
-    async function getRates() {
-        try {
-            const btc = await (await fetch('https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd')).json();
-            document.getElementById('btc-rate').innerText = '$' + btc.bitcoin.usd.toLocaleString();
-            const rub = await (await fetch('https://api.exchangerate-api.com/v4/latest/USD')).json();
-            document.getElementById('usd-rate').innerText = rub.rates.RUB.toFixed(2) + '₽';
-        } catch(e) {}
-    }
-
-    // --- СИНХРОНИЗАЦИЯ БЛОКНОТА ---
-    async function syncNotebookToCloud() {
-        try {
-            const dataToSave = { 
-                tasks: typeof tasks !== 'undefined' ? tasks : [], 
-                habits: typeof habits !== 'undefined' ? habits : [], 
-                notes: typeof notes !== 'undefined' ? notes : [], 
-                goals_list: typeof goals_list !== 'undefined' ? goals_list : [] 
-            };
-            const { error } = await _supabase.from('notebook').upsert({ 
-                id: userId, 
-                data: dataToSave, 
-                updated_at: new Date().toISOString() 
-            });
-            if (error) throw error;
-        } catch (e) { console.error("Save error:", e); }
-    }
-
-    async function syncNotebookFromCloud() {
-        try {
-            const { data, error } = await _supabase.from('notebook').select('data').eq('id', userId).single();
-            if (error && error.code !== 'PGRST116') throw error;
-            if (data && data.data) {
-                tasks = data.data.tasks || [];
-                habits = data.data.habits || [];
-                notes = data.data.notes || [];
-                goals_list = data.data.goals_list || [];
-                if (typeof saveNotebook === 'function') saveNotebook(); 
-                if (typeof renderTasks === 'function') renderTasks();
-                if (typeof renderHabits === 'function') renderHabits();
-                if (typeof renderNotes === 'function') renderNotes();
-                if (typeof renderGoals === 'function') renderGoals();
-            }
-        } catch (e) { console.error("Sync error:", e); }
-    }
-
-    // --- УПРАВЛЕНИЕ ЦЕЛЯМИ ---
-    function openGoalAction(id) {
-        selectedGoalId = id.toString();
-        const goal = goals_list.find(g => g.id === selectedGoalId);
-        if (goal) {
-            document.getElementById('modal-goal-title').innerText = goal.title;
-            document.getElementById('goal-action-modal').style.display = 'flex';
-            if(window.tg) tg.HapticFeedback.impactOccurred('medium');
-        }
-    }
-
-    function closeGoalActionModal() {
-        document.getElementById('goal-action-modal').style.display = 'none';
-        document.getElementById('add-goal-money').value = '';
-    }
-
-    async function addMoneyToGoal() {
-        const input = document.getElementById('add-goal-money');
-        const val = parseFloat(input.value);
-        if (!val || val <= 0) return;
-        const goal = goals_list.find(g => g.id === selectedGoalId);
-        if (goal) {
-            goal.current += val;
-            closeGoalActionModal();
-            renderGoals();
-            await syncNotebookToCloud();
-            if(window.tg) tg.HapticFeedback.notificationOccurred('success');
-        }
-    }
-
-    async function deleteGoalReal() {
-        if (!confirm("Удалить эту цель?")) return;
-        goals_list = goals_list.filter(g => g.id !== selectedGoalId);
+    const goal = goals_list.find(g => g.id === selectedGoalId);
+    if (goal) {
+        goal.current += val;
         closeGoalActionModal();
         renderGoals();
-        await syncNotebookToCloud();
+        if (typeof syncNotebookToCloud === 'function') await syncNotebookToCloud();
+        if(window.tg) tg.HapticFeedback.notificationOccurred('success');
     }
+}
 
-    async function editGoalName() {
-        const goal = goals_list.find(g => g.id === selectedGoalId);
-        if (!goal) return;
-        const newName = prompt("Новое название цели:", goal.title);
-        if (newName) {
-            goal.title = newName;
-            renderGoals();
-            await syncNotebookToCloud();
-        }
+// Удалить цель
+async function deleteGoalReal() {
+    if (!confirm("Удалить эту цель?")) return;
+    goals_list = goals_list.filter(g => g.id !== selectedGoalId);
+    closeGoalActionModal();
+    renderGoals();
+    if (typeof syncNotebookToCloud === 'function') await syncNotebookToCloud();
+}
+
+// Редактировать название
+async function editGoalName() {
+    const goal = goals_list.find(g => g.id === selectedGoalId);
+    const newName = prompt("Новое название цели:", goal.title);
+    if (newName) {
+        goal.title = newName;
+        renderGoals();
+        if (typeof syncNotebookToCloud === 'function') await syncNotebookToCloud();
     }
+}
     </script>
 </body>
 </html>
