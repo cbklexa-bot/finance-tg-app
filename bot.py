@@ -5,7 +5,6 @@ import telebot
 from flask import Flask, request, jsonify
 from supabase import create_client, Client
 from datetime import datetime, timedelta
-import g4f # Библиотека для работы ИИ
 
 # --- НАСТРОЙКИ ---
 TOKEN = os.environ.get('BOT_TOKEN')
@@ -17,28 +16,33 @@ bot = telebot.TeleBot(TOKEN)
 supabase: Client = create_client(URL, KEY)
 app = Flask(__name__)
 
-# --- ЧАСТЬ 1: СЕРВЕР ДЛЯ ИИ (FLASK) ---
+# --- ЛОГИКА FLASK (СЕРВЕР ДЛЯ AI И HEALTH CHECK) ---
 
 @app.route('/')
 def health_check():
-    # Просто чтобы Render знал, что мы живы
-    return "NeyroSchet AI Server is running", 200
+    return "App is running", 200
 
+# Обработчик AI (исправляет ошибку 501)
 @app.route('/chat', methods=['POST'])
 def chat_ai():
     try:
-        # Получаем текст от сайта
         data = request.json
         prompt = data.get('prompt', '')
+        # history = data.get('history', []) # Можно использовать для контекста
+
+        # --- ЗДЕСЬ ТВОЯ ЛОГИКА AI ---
+        # Если ты используешь g4f или OpenAI, вставь код сюда.
+        # Пока сделаем простую заглушку, чтобы проверить связь:
         
-        # Запрашиваем ответ у ИИ (используем gpt-3.5 или 4o-mini через g4f)
+        import g4f # Попробуем использовать бесплатный AI
+        
         response = g4f.ChatCompletion.create(
-            model="gpt-4o-mini",
+            model="gpt-3.5-turbo",
             messages=[{"role": "user", "content": prompt}],
             stream=False
         )
         
-        # Отправляем ответ обратно на сайт
+        # Пытаемся вернуть JSON, который ждет твой frontend
         return jsonify({
             "choices": [{
                 "message": {
@@ -49,13 +53,12 @@ def chat_ai():
 
     except Exception as e:
         print(f"Ошибка AI: {e}")
-        return jsonify({"error": "AI service error", "details": str(e)}), 500
+        return jsonify({"error": str(e)}), 500
 
-# --- ЧАСТЬ 2: ТЕЛЕГРАМ БОТ ---
+# --- ЛОГИКА TELEGRAM BOTA ---
 
 @bot.message_handler(commands=['start'])
 def start(message):
-    # Проверка на параметр оплаты ?start=pay
     if len(message.text.split()) > 1 and "pay" in message.text.split()[1]:
         bot.send_invoice(
             message.chat.id,
@@ -68,64 +71,48 @@ def start(message):
             start_parameter="pay"
         )
     else:
-        # Обычный вход - показываем кнопку
         markup = telebot.types.InlineKeyboardMarkup()
-        # ВАЖНО: Убедись, что ссылка правильная (твоего Mini App)
-        btn = telebot.types.InlineKeyboardButton(
-            "🚀 Открыть НейроСчет", 
-            web_app=telebot.types.WebAppInfo(url="https://finance-tg-app.onrender.com")
-        )
+        # Вставь сюда URL своего приложения на Render или t.me ссылку
+        app_url = "https://t.me/Finans_Neyro_bot/app" 
+        btn = telebot.types.InlineKeyboardButton("🚀 Открыть НейроСчет", web_app=telebot.types.WebAppInfo(url="https://finance-tg-app.onrender.com"))
         markup.add(btn)
-        
-        bot.send_message(
-            message.chat.id, 
-            "Добро пожаловать в НейроСчет!\n\nТвой финансовый ассистент с ИИ.\nНажми кнопку ниже, чтобы начать:",
-            reply_markup=markup
-        )
+        bot.send_message(message.chat.id, "Добро пожаловать! Нажми кнопку ниже:", reply_markup=markup)
 
-# Обработка предварительного запроса оплаты
 @bot.pre_checkout_query_handler(func=lambda query: True)
 def checkout(query):
     bot.answer_pre_checkout_query(query.id, ok=True)
 
-# Обработка успешной оплаты
 @bot.message_handler(content_types=['successful_payment'])
 def success(message):
     user_id = message.from_user.id
     new_date = (datetime.now() + timedelta(days=30)).isoformat()
-    
     try:
-        supabase.table("subscriptions").upsert({
-            "user_id": user_id, 
-            "expires_at": new_date
-        }).execute()
-        
-        bot.send_message(message.chat.id, "✅ Оплата прошла успешно! Ваш доступ продлен на 30 дней. Перезапустите приложение.")
+        supabase.table("subscriptions").upsert({"user_id": user_id, "expires_at": new_date}).execute()
+        bot.send_message(message.chat.id, "✅ Подписка продлена! Перезапустите приложение.")
     except Exception as e:
-        print(f"Ошибка БД: {e}")
-        bot.send_message(message.chat.id, "⚠️ Оплата прошла, но возникла ошибка сохранения. Напишите в поддержку.")
+        bot.send_message(message.chat.id, "Ошибка базы данных, но оплата прошла.")
 
-# --- ЗАПУСК ВСЕГО ВМЕСТЕ ---
+# --- ЗАПУСК ---
 
 def run_flask():
-    # Запускаем сервер на порту 10000 (для Render)
+    # Render требует слушать порт 10000 (или из env)
     port = int(os.environ.get("PORT", 10000))
     app.run(host="0.0.0.0", port=port)
 
 if __name__ == "__main__":
-    # 1. Сбрасываем старые вебхуки, чтобы бот не тупил
+    # 1. Сбрасываем вебхук (Лечит ошибку Network unreachable / conflict)
     try:
-        print("Сброс вебхука...")
+        print("Удаляю вебхук...")
         bot.remove_webhook()
         time.sleep(1)
     except Exception as e:
-        print(e)
+        print(f"Ошибка при удалении вебхука (не страшно): {e}")
 
-    # 2. Запускаем Flask (для ИИ) в отдельном потоке
-    flask_thread = threading.Thread(target=run_flask)
-    flask_thread.daemon = True
-    flask_thread.start()
+    # 2. Запускаем сервер Flask в отдельном потоке (Для AI и Render)
+    t = threading.Thread(target=run_flask)
+    t.daemon = True
+    t.start()
 
-    # 3. Запускаем Бота (основной процесс)
-    print("Бот и ИИ сервер запущены...")
+    # 3. Запускаем бота (infinity_polling лучше обычного polling)
+    print("Запускаю бота...")
     bot.infinity_polling(skip_pending=True)
