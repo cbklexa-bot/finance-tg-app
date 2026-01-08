@@ -594,24 +594,17 @@
 
         // --- Сохранение и Синхронизация Блокнота ---
         async function cloudSaveNotebook() {
-    // Добавляем budgets в объект, который улетает в Supabase
-    const notebookData = { tasks, habits, notes, goals: goals_list, budgets }; 
-    const { error } = await _supabase.from('notebook').upsert({ 
-        id: userId, 
-        data: notebookData, 
-        updated_at: new Date() 
-    }, { onConflict: 'id' });
-}
+            const notebookData = { tasks, habits, notes, goals };
+            const { error } = await _supabase.from('notebook').upsert({ id: userId, data: notebookData, updated_at: new Date() }, { onConflict: 'id' });
+        }
 
          function saveNotebook() {
-    localStorage.setItem('fin_tasks_' + userId, JSON.stringify(tasks));
-    localStorage.setItem('fin_habits_' + userId, JSON.stringify(habits));
-    localStorage.setItem('fin_notes_' + userId, JSON.stringify(notes));
-    localStorage.setItem('fin_goals_' + userId, JSON.stringify(goals_list)); 
-    // ДОБАВЛЕНО: Сохраняем бюджеты локально
-    localStorage.setItem('fin_budgets_' + userId, JSON.stringify(budgets)); 
-    cloudSaveNotebook();
-} 
+             localStorage.setItem('fin_tasks_' + userId, JSON.stringify(tasks));
+             localStorage.setItem('fin_habits_' + userId, JSON.stringify(habits));
+             localStorage.setItem('fin_notes_' + userId, JSON.stringify(notes));
+             localStorage.setItem('fin_goals_' + userId, JSON.stringify(goals_list)); 
+             cloudSaveNotebook();
+        } 
 
         function loadNotebook() {
             const t = localStorage.getItem('fin_tasks_' + userId);
@@ -633,23 +626,18 @@
 
 // 1. ЗАГРУЗКА ДАННЫХ ИЗ ОБЛАКА
         async function syncNotebookFromCloud() {
-    try {
-        const { data } = await _supabase.from('notebook').select('data').eq('id', userId).single();
-        if (data && data.data) {
-            tasks = data.data.tasks || [];
-            habits = data.data.habits || [];
-            notes = data.data.notes || [];
-            goals_list = data.data.goals || data.data.goals_list || []; 
-            // ДОБАВЛЕНО: Загружаем бюджеты
-            budgets = data.data.budgets || []; 
-            
-            saveNotebook();
-            renderTasks(); renderHabits(); renderNotes(); renderGoals();
-            // ДОБАВЛЕНО: Отрисовываем бюджеты после загрузки
-            if (typeof renderBudgets === 'function') renderBudgets(); 
+            try {
+                const { data } = await _supabase.from('notebook').select('data').eq('id', userId).single();
+                if (data && data.data) {
+                    tasks = data.data.tasks || [];
+                    habits = data.data.habits || [];
+                    notes = data.data.notes || [];
+                    goals_list = data.data.goals_list || []; 
+                    saveNotebook();
+                    renderTasks(); renderHabits(); renderNotes(); renderGoals();
+                }
+            } catch (e) { console.error("Ошибка загрузки:", e); }
         }
-    } catch (e) { console.error("Ошибка загрузки:", e); }
-}
 
         // 2. ФУНКЦИЯ СОЗДАНИЯ ЦЕЛИ
         async function addGoal() {
@@ -887,37 +875,15 @@
 
         function closeBudModal() { document.getElementById('budget-modal').style.display = 'none'; }
         
-       function addBudget() { 
-    const n = document.getElementById('new-bud-name').value, 
-          v = parseFloat(document.getElementById('new-bud-val').value); 
-    if(!n || isNaN(v)) return;
-    
-    const data = {name: n, limit: v, cat: budSelectedCat};
-    
-    if(editingBudIdx !== null) {
-        budgets[editingBudIdx] = data; 
-    } else {
-        budgets.push(data); 
-    }
-    
-    closeBudModal(); 
-    updateUI(); 
-    
-    // ВМЕСТО cloudSave() ИСПОЛЬЗУЕМ saveNotebook()
-    // Это сохранит бюджет в ту же таблицу, где лежат заметки и цели
-    saveNotebook(); 
-}
+        function addBudget() { 
+            const n = document.getElementById('new-bud-name').value, v = parseFloat(document.getElementById('new-bud-val').value); 
+            if(!n || isNaN(v)) return;
+            const data = {name: n, limit: v, cat: budSelectedCat};
+            if(editingBudIdx !== null) budgets[editingBudIdx] = data; else budgets.push(data); 
+            closeBudModal(); updateUI(); cloudSave(); 
+        }
 
-        function deleteBudgetReal() { 
-    if (editingBudIdx !== null) {
-        budgets.splice(editingBudIdx, 1); 
-        closeBudModal(); 
-        updateUI(); 
-        
-        // ДОБАВЛЯЕМ СОХРАНЕНИЕ В ОБЛАКО
-        saveNotebook(); 
-    }
-}
+        function deleteBudgetReal() { budgets.splice(editingBudIdx, 1); closeBudModal(); updateUI(); cloudSave(); }
 
         // Графики
         function renderDayChart() {
@@ -1167,48 +1133,48 @@ async function askAI() {
    async function checkSubscription() {
     try {
         const tgUser = window.tg?.initDataUnsafe?.user;
-        // Исправленный ID (убрал лишнюю "1" в конце)
-        const currentIdStr = tgUser?.id?.toString() || "679399376"; 
+        // УБЕДИСЬ, ЧТО ЭТОТ ID СОВПАДАЕТ С ID В ТАБЛИЦЕ SUPABASE
+        const currentIdStr = tgUser?.id?.toString() || "6793993761"; 
         const numericId = parseInt(currentIdStr);
 
-        // Игнорируем админа
-        if (currentIdStr === "679399376") {
-            const payModal = document.getElementById('paywall-modal');
-            if (payModal) payModal.style.display = 'none';
+        // Проверка админа (если это твой ID — окно не вылезет)
+        if (currentIdStr === "679399376") return; 
+
+        let { data, error } = await _supabase
+            .from('subscriptions')
+            .select('*')
+            .eq('user_id', numericId)
+            .single();
+
+        const now = new Date();
+
+        if (!data) {
+            // Если в базе пусто, создаем триал и выходим
+            const trialEnd = new Date();
+            trialEnd.setDate(trialEnd.getDate() + 7);
+            await _supabase.from('subscriptions').insert({ 
+                user_id: numericId, 
+                expires_at: trialEnd.toISOString() 
+            });
             return;
         }
 
-        const { data, error } = await _supabase
-            .from('subscriptions')
-            .select('expires_at')
-            .eq('user_id', numericId)
-            .maybeSingle();
-
-        const now = new Date();
-        const payModal = document.getElementById('paywall-modal');
-
-        // ЕСЛИ ПОЛЬЗОВАТЕЛЬ НАЙДЕН
-        if (data && data.expires_at) {
-            const expireDate = new Date(data.expires_at);
-            if (now < expireDate) {
-                if (payModal) {
-                    payModal.style.display = 'none';
-                    payModal.style.setProperty('display', 'none', 'important');
-                }
-                console.log("Доступ разрешен до:", expireDate);
-                return;
-            }
-        }
-
-        // ЕСЛИ ПОЛЬЗОВАТЕЛЬ НЕ НАЙДЕН ИЛИ ПОДПИСКА ИСТЕКЛА
-        // (Убрал авто-создание триала, чтобы не плодить ID с +7 дней)
-        if (payModal) {
-            payModal.style.display = 'flex';
-            payModal.style.setProperty('display', 'flex', 'important');
-        }
+        const expireDate = new Date(data.expires_at);
         
+        // СРАВНЕНИЕ ДАТ
+        if (now > expireDate) {
+            console.log("СРОК ИСТЕК");
+            // Используем таймаут, чтобы окно появилось ПОСЛЕ загрузки всех страниц
+            setTimeout(() => {
+                const payModal = document.getElementById('paywall-modal');
+                if (payModal) {
+                    payModal.style.setProperty('display', 'flex', 'important');
+                    payModal.style.zIndex = "999999"; // Максимальный приоритет
+                }
+            }, 1000); 
+        }
     } catch (e) {
-        console.error("Ошибка проверки:", e);
+        console.error("Ошибка:", e);
     }
 }
 
@@ -1422,6 +1388,7 @@ async function editGoalName() {
     </script>
 </body>
 </html>
+
 
 
 
