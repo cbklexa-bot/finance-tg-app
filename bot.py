@@ -1,73 +1,54 @@
 import os
 import time
-import telebot
 import threading
-import requests  # Добавлено для работы с OpenRouter
+import telebot
 from flask import Flask, request, jsonify, send_from_directory
-from flask_cors import CORS
+from flask_cors import CORS  # Добавили для работы бюджета
 from supabase import create_client, Client
 from datetime import datetime, timedelta
+import g4f
 
 # --- НАСТРОЙКИ ---
 TOKEN = os.environ.get('BOT_TOKEN')
 URL = os.environ.get('SUPABASE_URL')
 KEY = os.environ.get('SUPABASE_KEY')
-# Берем ключ OpenRouter из настроек Environment Variables на Render
-OPENROUTER_KEY = os.environ.get('OPENROUTER_API_KEY')
 
 bot = telebot.TeleBot(TOKEN)
 supabase: Client = create_client(URL, KEY)
 
 app = Flask(__name__, static_folder='.')
-CORS(app)
+CORS(app) # Разрешаем приложению подгружать данные из БД
 
-# --- ЧАСТЬ 1: ОТОБРАЖЕНИЕ ПРИЛОЖЕНИЯ ---
+# --- СЕРВЕРНАЯ ЧАСТЬ (ДЛЯ ИИ И ПРИЛОЖЕНИЯ) ---
+
 @app.route('/')
-def serve_index():
+def index():
+    # Отдаем твой index.html
     return send_from_directory('.', 'index.html')
 
-# --- ЧАСТЬ 2: ОБРАБОТЧИК ИИ (OpenRouter вместо g4f) ---
 @app.route('/chat', methods=['POST'])
 def chat_ai():
     try:
         data = request.json
-        prompt = data.get('prompt') or data.get('message') or ""
+        prompt = data.get('prompt', '')
         
-        if not OPENROUTER_KEY:
-            return jsonify({"error": "API key not configured on Render"}), 500
-
-        headers = {
-            "Authorization": f"Bearer {OPENROUTER_KEY}",
-            "Content-Type": "application/json",
-            "HTTP-Referer": "https://finance-tg-app.onrender.com", # Обязательно для Render
-            "X-Title": "Finance App"
-        }
-
-        payload = {
-            "model": "google/gemini-2.0-flash-exp:free",
-            "messages": [{"role": "user", "content": prompt}]
-        }
-
-        # Делаем официальный запрос к OpenRouter
-        response = requests.post(
-            "https://openrouter.ai/api/v1/chat/completions",
-            headers=headers,
-            json=payload,
-            timeout=25
+        # Запрос к ИИ
+        response = g4f.ChatCompletion.create(
+            model="gpt-4o-mini",
+            messages=[{"role": "user", "content": prompt}],
+            stream=False
         )
-
-        if response.status_code != 200:
-            print(f"OpenRouter Error: {response.text}")
-            return jsonify({"error": "OpenRouter API error"}), response.status_code
-
-        # Возвращаем ответ в формате, который ждет твой JS на фронтенде
-        return jsonify(response.json())
-
+        
+        # Возвращаем в формате, который понимает твой index.html
+        return jsonify({
+            "choices": [{"message": {"content": response}}]
+        })
     except Exception as e:
         print(f"Ошибка ИИ: {e}")
         return jsonify({"error": str(e)}), 500
 
-# --- ЧАСТЬ 3: ТЕЛЕГРАМ БОТ ---
+# --- БОТ (КОМАНДЫ И ОПЛАТА ИЗ ТВОЕГО КОДА) ---
+
 @bot.message_handler(commands=['start'])
 def start(message):
     if "pay" in message.text:
@@ -82,10 +63,14 @@ def start(message):
             start_parameter="pay"
         )
     else:
-        bot.send_message(
-            message.chat.id, 
-            "Жми кнопку НейроСчет!- запуститься Твой личный финансовый асистент разработаный на базе AI\n\nЯ."
+        # Добавляем кнопку открытия, чтобы было удобно
+        markup = telebot.types.InlineKeyboardMarkup()
+        btn = telebot.types.InlineKeyboardButton(
+            "🚀 Открыть НейроСчет", 
+            web_app=telebot.types.WebAppInfo(url="https://finance-tg-app.onrender.com")
         )
+        markup.add(btn)
+        bot.send_message(message.chat.id, "Добро пожаловать! Используйте Mini App для управления финансами.", reply_markup=markup)
 
 @bot.pre_checkout_query_handler(func=lambda query: True)
 def checkout(query):
@@ -100,24 +85,26 @@ def success(message):
             "user_id": user_id, 
             "expires_at": new_date
         }).execute()
-        bot.send_message(message.chat.id, "✅ Оплата прошла успешно!")
+        bot.send_message(message.chat.id, "✅ Оплата прошла успешно! Перезапустите приложение.")
     except Exception as e:
-        bot.send_message(message.chat.id, "⚠️ Ошибка БД. Напишите в поддержку.")
+        print(f"Ошибка Supabase: {e}")
+        bot.send_message(message.chat.id, "⚠️ Ошибка обновления базы. Напишите в поддержку.")
 
-# --- ЧАСТЬ 4: ЗАПУСК ---
-def run_bot_safe():
+# --- ЗАПУСК ---
+
+def run_flask():
+    port = int(os.environ.get("PORT", 10000))
+    app.run(host="0.0.0.0", port=port)
+
+if __name__ == "__main__":
+    # Запускаем сайт/ИИ
+    threading.Thread(target=run_flask, daemon=True).start()
+    
+    # Запускаем бота (с защитой от вылетов)
+    print("Бот НейроСчет запущен...")
     while True:
         try:
-            bot.remove_webhook()
-            print("Бот НейроСчет запущен...")
-            bot.infinity_polling(none_stop=True, timeout=90)
+            bot.infinity_polling(skip_pending=True, timeout=90)
         except Exception as e:
-            if "Conflict" in str(e):
-                time.sleep(5)
-            else:
-                time.sleep(10)
-
-if __name__ == '__main__':
-    threading.Thread(target=run_bot_safe, daemon=True).start()
-    port = int(os.environ.get("PORT", 10000))
-    app.run(host='0.0.0.0', port=port)
+            print(f"Перезапуск бота: {e}")
+            time.sleep(5)
