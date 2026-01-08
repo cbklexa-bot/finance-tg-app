@@ -2,50 +2,67 @@ import os
 import time
 import telebot
 import threading
+import requests  # Добавлено для работы с OpenRouter
 from flask import Flask, request, jsonify, send_from_directory
 from flask_cors import CORS
 from supabase import create_client, Client
 from datetime import datetime, timedelta
-import g4f
 
 # --- НАСТРОЙКИ ---
 TOKEN = os.environ.get('BOT_TOKEN')
 URL = os.environ.get('SUPABASE_URL')
 KEY = os.environ.get('SUPABASE_KEY')
+# Берем ключ OpenRouter из настроек Environment Variables на Render
+OPENROUTER_KEY = os.environ.get('OPENROUTER_API_KEY')
 
 bot = telebot.TeleBot(TOKEN)
 supabase: Client = create_client(URL, KEY)
 
-# Указываем Flask, что статические файлы лежат в той же папке
 app = Flask(__name__, static_folder='.')
 CORS(app)
 
-# --- ЧАСТЬ 1: ОТОБРАЖЕНИЕ ПРИЛОЖЕНИЯ (INDEX.HTML) ---
+# --- ЧАСТЬ 1: ОТОБРАЖЕНИЕ ПРИЛОЖЕНИЯ ---
 @app.route('/')
 def serve_index():
-    # Теперь по главной ссылке откроется твое приложение, а не надпись
     return send_from_directory('.', 'index.html')
 
-# --- ЧАСТЬ 2: ОБРАБОТЧИК ИИ (AI) ---
+# --- ЧАСТЬ 2: ОБРАБОТЧИК ИИ (OpenRouter вместо g4f) ---
 @app.route('/chat', methods=['POST'])
 def chat_ai():
     try:
         data = request.json
         prompt = data.get('prompt') or data.get('message') or ""
         
-        response = g4f.ChatCompletion.create(
-            model="gpt-4o-mini",
-            messages=[{"role": "user", "content": prompt}],
-            stream=False
+        if not OPENROUTER_KEY:
+            return jsonify({"error": "API key not configured on Render"}), 500
+
+        headers = {
+            "Authorization": f"Bearer {OPENROUTER_KEY}",
+            "Content-Type": "application/json",
+            "HTTP-Referer": "https://finance-tg-app.onrender.com", # Обязательно для Render
+            "X-Title": "Finance App"
+        }
+
+        payload = {
+            "model": "google/gemini-2.0-flash-exp:free",
+            "messages": [{"role": "user", "content": prompt}]
+        }
+
+        # Делаем официальный запрос к OpenRouter
+        response = requests.post(
+            "https://openrouter.ai/api/v1/chat/completions",
+            headers=headers,
+            json=payload,
+            timeout=25
         )
-        
-        return jsonify({
-            "choices": [{
-                "message": {
-                    "content": response
-                }
-            }]
-        })
+
+        if response.status_code != 200:
+            print(f"OpenRouter Error: {response.text}")
+            return jsonify({"error": "OpenRouter API error"}), response.status_code
+
+        # Возвращаем ответ в формате, который ждет твой JS на фронтенде
+        return jsonify(response.json())
+
     except Exception as e:
         print(f"Ошибка ИИ: {e}")
         return jsonify({"error": str(e)}), 500
