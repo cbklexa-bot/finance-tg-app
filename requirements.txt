@@ -1,6 +1,5 @@
-pyTelegramBotAPI
-supabase
 flask
 flask-cors
-g4f
+pyTelegramBotAPI
+supabase
 requests
