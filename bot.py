@@ -8,7 +8,6 @@ import re
 from flask import Flask, request, jsonify, send_from_directory
 from flask_cors import CORS
 from supabase import create_client, Client
-from datetime import datetime, timedelta
 
 # --- НАСТРОЙКИ ---
 TOKEN = os.environ.get('BOT_TOKEN')
@@ -33,54 +32,63 @@ def chat_ai():
         prompt = data.get('prompt') or data.get('message') or ""
         user_id = data.get('user_id')
 
-        # 1. ТОЧНЫЙ РАСЧЕТ БАЛАНСА ИЗ БАЗЫ
-        stats_info = "Данных о транзакциях пока нет."
+        # 1. СБОР ИСТОРИИ ДЛЯ ГЛУБОКОГО АНАЛИЗА
+        stats_summary = "Данных нет."
+        history_text = "История операций пуста."
         if user_id:
             try:
-                res = supabase.table("transactions").select("*").eq("user_id", user_id).execute()
+                res = supabase.table("transactions").select("*").eq("user_id", user_id).order("created_at", desc=True).limit(50).execute()
                 if res.data:
-                    income = sum(t['amount'] for t in res.data if t['type'] == 'income')
-                    expense = sum(t['amount'] for t in res.data if t['type'] == 'expense')
-                    balance = income - expense
-                    stats_info = f"ТОЧНЫЙ ТЕКУЩИЙ БАЛАНС: {balance}. Общий доход: {income}. Общий расход: {expense}. Всего операций: {len(res.data)}."
-            except Exception as e:
-                print(f"Ошибка БД: {e}")
+                    inc = sum(t['amount'] for t in res.data if t['type'] == 'income')
+                    exp = sum(t['amount'] for t in res.data if t['type'] == 'expense')
+                    stats_summary = f"БАЛАНС: {inc - exp} | ДОХОД: {inc} | РАСХОД: {exp}"
+                    lines = [f"- {t['created_at'][:10]}: {t['type']} | {t['category']} | {t['amount']} руб. ({t.get('description','')})" for t in res.data]
+                    history_text = "\n".join(lines)
+            except Exception as e: print(f"DB Error: {e}")
 
-        # 2. ИНСТРУКЦИЯ ДЛЯ ЭКСПЕРТА
+        # 2. ИНСТРУКЦИЯ С ТВОИМИ КАТЕГОРИЯМИ
         system_instruction = f"""
-        Ты — финансовый эксперт-консультант "НейроСчет". 
-        Твоя база знаний по текущему пользователю: {stats_info}
+        Ты — DeepSeek-V3, личный финансовый консультант. Твоя задача — вести учет и анализировать историю.
+
+        ДАННЫЕ ПОЛЬЗОВАТЕЛЯ:
+        {stats_summary}
         
-        ТВОИ ЗАДАЧИ:
-        1. Если спрашивают баланс — называй число из блока "ТОЧНЫЙ ТЕКУЩИЙ БАЛАНС". Не выдумывай свое!
-        2. Категоризируй траты: 
-           - Авто (бензин, мойка, ремонт, запчасти, шиномонтаж, страховка)
-           - Жилье (коммуналка, свет, вода, интернет)
-           - Продукты (еда, супермаркет)
-           - Разное (аптека, кафе, кофе)
-        3. Если нужно записать расход/доход, ОБЯЗАТЕЛЬНО добавь в конец сообщения:
-        [JSON_DATA]{{"amount": число, "category": "категория", "type": "expense или income", "description": "описание"}}[/JSON_DATA]
+        ПОСЛЕДНИЕ ОПЕРАЦИИ:
+        {history_text}
+
+        ТВОИ КАТЕГОРИИ РАСХОДОВ:
+        - продукты, авто, жильё, шопинг, аптека, подарки, отдых, прочее.
+
+        ТВОИ КАТЕГОРИИ ДОХОДОВ:
+        - зарплата, инвест, подарок, прочее.
+
+        ТВОИ ПРАВИЛА:
+        1. Распознавай тип (expense/income) и категорию автоматически.
+        2. Если нужно записать, ОБЯЗАТЕЛЬНО используй формат:
+        [JSON_DATA]{{"amount": число, "category": "название_категории", "type": "expense|income", "description": "описание"}}[/JSON_DATA]
+        3. Анализируй историю: если в категории "шопинг" много трат, посоветуй быть экономнее.
+        4. Отвечай кратко, но профессионально.
         """
 
-        # 3. ЗАПРОС К OPENROUTER
-        headers = {"Authorization": f"Bearer {OR_KEY}", "Content-Type": "application/json"}
+        # 3. ЗАПРОС К OPENROUTER (DEEPSEEK-V3)
+        headers = {
+            "Authorization": f"Bearer {OR_KEY}",
+            "Content-Type": "application/json",
+            "HTTP-Referer": "https://finance-tg-app.onrender.com"
+        }
         payload = {
             "model": "deepseek/deepseek-chat",
             "messages": [
                 {"role": "system", "content": system_instruction},
                 {"role": "user", "content": prompt}
             ],
-            "route": "fallback"
+            "temperature": 0.1
         }
         
-        response = requests.post("https://openrouter.ai/api/v1/chat/completions", headers=headers, json=payload, timeout=30).json()
-        
-        if 'choices' not in response:
-            return jsonify({"error": "AI Error"}), 500
-            
+        response = requests.post("https://openrouter.ai/api/v1/chat/completions", headers=headers, json=payload, timeout=45).json()
         ai_message = response['choices'][0]['message']['content']
 
-        # 4. АВТОМАТИЧЕСКАЯ ЗАПИСЬ В SUPABASE
+        # 4. АВТОЗАПИСЬ В БАЗУ
         if "[JSON_DATA]" in ai_message:
             match = re.search(r"\[JSON_DATA\](.*?)\[/JSON_DATA\]", ai_message)
             if match and user_id:
@@ -89,39 +97,22 @@ def chat_ai():
                     supabase.table("transactions").insert({
                         "user_id": user_id,
                         "amount": float(tx['amount']),
-                        "category": tx['category'],
+                        "category": tx['category'].lower(),
                         "type": tx['type'],
                         "description": tx.get('description', '')
                     }).execute()
                     ai_message = ai_message.replace(match.group(0), "").strip()
-                except Exception as db_e:
-                    print(f"Ошибка вставки в БД: {db_e}")
+                except: pass
 
         return jsonify({"choices": [{"message": {"content": ai_message}}]})
 
     except Exception as e:
-        print(f"Global Error: {e}")
         return jsonify({"error": str(e)}), 500
 
-# --- КОД БОТА БЕЗ КНОПОК ---
 @bot.message_handler(commands=['start'])
 def start(message):
-    welcome_text = (
-        "🦁 Привет! Я твой финансовый эксперт.\n\n"
-        "Я помогу тебе вести учет доходов и расходов. Просто пиши мне в чат сообщения в свободном стиле, "
-        "например: 'потратил на бензин 2000' или 'купил хлеб и молоко на 300'.\n\n"
-        "Я сам определю категорию и запишу всё в базу. Также ты можешь спросить меня о текущем балансе или анализе трат."
-    )
-    bot.send_message(message.chat.id, welcome_text)
-
-def run_flask():
-    port = int(os.environ.get("PORT", 10000))
-    app.run(host="0.0.0.0", port=port)
+    bot.send_message(message.chat.id, "🦁 Привет! Твой персональный эксперт на базе DeepSeek-V3 готов к работе.'.")
 
 if __name__ == "__main__":
-    threading.Thread(target=run_flask, daemon=True).start()
-    while True:
-        try:
-            bot.infinity_polling(skip_pending=True)
-        except:
-            time.sleep(5)
+    threading.Thread(target=lambda: app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 10000))), daemon=True).start()
+    bot.infinity_polling()
