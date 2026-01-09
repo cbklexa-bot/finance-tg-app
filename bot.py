@@ -9,6 +9,7 @@ from flask import Flask, request, jsonify, send_from_directory
 from flask_cors import CORS
 from supabase import create_client, Client
 from datetime import datetime
+from telebot.apihelper import ApiTelegramException
 
 # --- НАСТРОЙКИ ---
 TOKEN = os.environ.get('BOT_TOKEN')
@@ -74,7 +75,7 @@ def chat_ai():
         2. ЗАПИСЬ: Если пользователь говорит что потратил или заработал, ты САМ определяешь категорию из списка выше. 
            Всегда отвечай подтверждением и в конце добавляй JSON:
            [JSON_DATA]{{"amount": число, "category": "категория", "type": "expense|income", "description": "описание"}}[/JSON_DATA]
-        3. КОНСУЛЬТАЦИЯ: Давай советы по экономии на основе истории. Если видишь много трат в категории "авто", посоветуй как оптимизировать.
+        3. КОНСУЛЬТАЦИЯ: Давай советы по экономии на основе истории.
 
         БАЛАНС СЕЙЧАС: {stats_summary}
         ИСТОРИЯ ОПЕРАЦИЙ:
@@ -94,7 +95,7 @@ def chat_ai():
                 {"role": "system", "content": system_instruction},
                 {"role": "user", "content": prompt}
             ],
-            "temperature": 0.3, # Небольшая гибкость для советов
+            "temperature": 0.3,
             "provider": { "allow_fallbacks": False }
         }
         
@@ -102,11 +103,11 @@ def chat_ai():
         response = response_raw.json()
         
         if 'choices' not in response:
-            return jsonify({"choices": [{"message": {"content": "Ошибка связи с DeepSeek. Попробуйте позже."}}]})
+            return jsonify({"choices": [{"message": {"content": "Ошибка связи с DeepSeek."}}]})
             
         ai_message = response['choices'][0]['message']['content']
 
-        # 4. ОБРАБОТКА JSON И ЗАПИСЬ В БАЗУ
+        # 4. ОБРАБОТКА JSON
         if "[JSON_DATA]" in ai_message:
             match = re.search(r"\[JSON_DATA\](.*?)\[/JSON_DATA\]", ai_message)
             if match and user_id:
@@ -119,7 +120,6 @@ def chat_ai():
                         "type": tx['type'],
                         "description": tx.get('description', '')
                     }).execute()
-                    # Убираем технический код из ответа пользователю
                     ai_message = ai_message.replace(match.group(0), "").strip()
                 except: pass
 
@@ -133,7 +133,31 @@ def chat_ai():
 def start(message):
     bot.send_message(message.chat.id, "Привет! Я твой личный финансовый эксперт.")
 
+# --- ЗАЩИТА ОТ 409 CONFLICT И ЗАПУСК ---
+def run_bot():
+    print("Запуск Telegram бота...")
+    # Удаляем вебхук, чтобы работал пуллинг
+    bot.remove_webhook()
+    time.sleep(1)
+    
+    while True:
+        try:
+            bot.polling(none_stop=True, interval=0, timeout=20)
+        except ApiTelegramException as e:
+            if e.error_code == 409:
+                print("Ошибка 409 (Конфликт). Ждем завершения старой сессии...")
+                time.sleep(10) # Ждем дольше на Render
+            else:
+                print(f"Ошибка Telegram API: {e}")
+                time.sleep(5)
+        except Exception as e:
+            print(f"Общая ошибка бота: {e}")
+            time.sleep(5)
+
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 10000))
+    # Flask в отдельном потоке
     threading.Thread(target=lambda: app.run(host="0.0.0.0", port=port), daemon=True).start()
-    bot.infinity_polling()
+    
+    # Запуск функции защиты
+    run_bot()
