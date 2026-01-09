@@ -981,7 +981,7 @@ async function askAI() {
     input.value = '';
 
     const tempId = 'ai-' + Date.now();
-    chat.innerHTML += `<div id="${tempId}" class="ai-msg">🤖 Думаю и анализирую…</div>`;
+    chat.innerHTML += `<div id="${tempId}" class="ai-msg">Обрабатываю...</div>`;
     chat.scrollTop = chat.scrollHeight;
 
     try {
@@ -990,11 +990,48 @@ async function askAI() {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 prompt: q,
-                user_id: userId, // <--- ВОТ СЮДА ДОБАВЛЯЕМ
+                user_id: userId,
                 history: db.slice(0, 300)
             })
         });
 
+        if (!response.ok) throw new Error('HTTP ' + response.status);
+
+        const raw = await response.json();
+        // Берем текст ответа
+        const content = raw?.choices?.[0]?.message?.content || '';
+
+        if (!content) {
+            document.getElementById(tempId).innerText = '⚠️ Ошибка: пустой ответ.';
+            return;
+        }
+
+        // --- ВОТ ЭТОТ БЛОК НУЖНО ДОБАВИТЬ/ОБНОВИТЬ ---
+        
+        // 1. Убираем [JSON_DATA] из текста, чтобы пользователь его не видел
+        const cleanText = content.replace(/\[JSON_DATA\].*?\[\/JSON_DATA\]/gs, "").trim();
+        document.getElementById(tempId).innerText = cleanText;
+
+        // 2. Если бот что-то записал (был JSON), обновляем интерфейс
+        if (content.includes("[JSON_DATA]")) {
+            console.log("Обнаружена запись в базу, обновляю данные...");
+            // Даем серверу 1.5 секунды завершить запись в Supabase и обновляем баланс
+            setTimeout(() => {
+                if (typeof syncFromCloud === 'function') {
+                    syncFromCloud(); 
+                }
+            }, 1500);
+        }
+        
+        // --------------------------------------------
+
+        chat.scrollTop = chat.scrollHeight;
+
+    } catch (e) {
+        console.error('AI Error:', e);
+        document.getElementById(tempId).innerText = '⚠️ Сервер Render не отвечает. Проверьте статус деплоя.';
+    }
+}
         if (!response.ok) {
             throw new Error('HTTP ' + response.status);
         }
@@ -1389,6 +1426,7 @@ async function editGoalName() {
     </script>
 </body>
 </html>
+
 
 
 
