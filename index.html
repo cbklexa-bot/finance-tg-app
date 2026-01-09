@@ -974,79 +974,27 @@
 async function askAI() {
     const input = document.getElementById('ai-input');
     const chat = document.getElementById('ai-chat');
-    
-    // Проверка наличия элементов, чтобы код не ломался
-    if (!input || !chat) return;
-    
     const q = input.value.trim();
     if (!q) return;
 
-    // Добавляем сообщение пользователя в чат
     chat.innerHTML += `<div class="user-msg">${q}</div>`;
     input.value = '';
 
     const tempId = 'ai-' + Date.now();
-    chat.innerHTML += `<div id="${tempId}" class="ai-msg">🤖 Обрабатываю...</div>`;
+    chat.innerHTML += `<div id="${tempId}" class="ai-msg">🤖 Думаю и анализирую…</div>`;
     chat.scrollTop = chat.scrollHeight;
 
     try {
-        // Проверяем, существует ли userId, чтобы не отправить undefined
-        const currentUserId = typeof userId !== 'undefined' ? userId : 'guest';
-
         const response = await fetch('https://finance-tg-app.onrender.com/chat', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 prompt: q,
-                user_id: currentUserId,
-                history: typeof db !== 'undefined' ? db.slice(0, 300) : []
+                user_id: userId, // <--- ВОТ СЮДА ДОБАВЛЯЕМ
+                history: db.slice(0, 300)
             })
         });
 
-        if (!response.ok) throw new Error('HTTP ' + response.status);
-
-        const raw = await response.json();
-        const content = raw?.choices?.[0]?.message?.content || '';
-
-        if (!content) {
-            document.getElementById(tempId).innerText = '⚠️ AI не прислал текст.';
-            return;
-        }
-
-        // 1. Очистка текста от JSON тегов
-        const cleanText = content.replace(/\[JSON_DATA\].*?\[\/JSON_DATA\]/gs, "").trim();
-        document.getElementById(tempId).innerText = cleanText;
-
-        // 2. Синхронизация данных, если была запись
-        if (content.includes("[JSON_DATA]")) {
-            console.log("Запись обнаружена, обновляю интерфейс через 1.5 сек...");
-            setTimeout(() => {
-                if (typeof syncFromCloud === 'function') {
-                    syncFromCloud();
-                }
-            }, 1500);
-        }
-
-    } catch (e) {
-        console.error('AI Error:', e);
-        const msgElement = document.getElementById(tempId);
-        if (msgElement) {
-            msgElement.innerText = '⚠️ Ошибка: Сервер не отвечает или проснулся. Попробуйте еще раз.';
-        }
-    } finally {
-        chat.scrollTop = chat.scrollHeight;
-    }
-}
-        
-        // --------------------------------------------
-
-        chat.scrollTop = chat.scrollHeight;
-
-    } catch (e) {
-        console.error('AI Error:', e);
-        document.getElementById(tempId).innerText = '⚠️ Сервер Render не отвечает. Проверьте статус деплоя.';
-    }
-}
         if (!response.ok) {
             throw new Error('HTTP ' + response.status);
         }
@@ -1441,6 +1389,8 @@ async function editGoalName() {
     </script>
 </body>
 </html>
+
+
 
 
 
