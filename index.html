@@ -990,7 +990,7 @@ async function askAI() {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 prompt: q,
-                user_id: userId
+                user_id: userId // Передаем только ID, историю бот возьмет сам из БД
             })
         });
 
@@ -1004,16 +1004,16 @@ async function askAI() {
             return;
         }
 
-        // Выводим ответ бота без технического JSON
-        document.getElementById(tempId).innerText = content.replace(/\[JSON_DATA\].*?\[\/JSON_DATA\]/gs, "").trim();
+        // 1. Очищаем ответ от технического JSON, чтобы пользователь видел только текст
+        const cleanText = content.replace(/\[JSON_DATA\].*?\[\/JSON_DATA\]/gs, "").trim();
+        document.getElementById(tempId).innerText = cleanText;
 
-        // ЕСЛИ БОТ СДЕЛАЛ ЗАПИСЬ: вызываем вашу функцию обновления данных
+        // 2. Если бот что-то записал (есть тег [JSON_DATA])
         if (content.includes("[JSON_DATA]")) {
-            // Если у вас функция называется syncFinance или syncFromCloud, вызовите её здесь
-            if (typeof syncFinance === 'function') {
-                setTimeout(syncFinance, 1500); 
-            } else if (typeof syncFromCloud === 'function') {
-                setTimeout(syncFromCloud, 1500);
+            // Вызываем вашу функцию загрузки данных из облака, чтобы обновить баланс и историю
+            // Убедитесь, что функция называется именно так
+            if (typeof syncFinanceFromCloud === 'function') {
+                setTimeout(syncFinanceFromCloud, 1500); 
             }
         }
 
@@ -1022,34 +1022,7 @@ async function askAI() {
         document.getElementById(tempId).innerText = '⚠️ Ошибка связи с сервером.';
     }
     chat.scrollTop = chat.scrollHeight;
-            })
-        });
-
-        if (!response.ok) {
-            throw new Error('HTTP ' + response.status);
-        }
-
-        const raw = await response.json();
-        const content = raw?.choices?.[0]?.message?.content || '';
-
-        if (!content) {
-            document.getElementById(tempId).innerText =
-                '⚠️ AI не вернул ответ. Попробуй переформулировать запрос.';
-            return;
-        }
-
-        // ===== КЛЮЧЕВОЙ ФИКС =====
-        // Ищем JSON внутри любого текста
-        const jsonMatch = content.match(/\{[\s\S]*?\}/);
-
-        let ai = null;
-        if (jsonMatch) {
-            try {
-                ai = JSON.parse(jsonMatch[0]);
-            } catch (e) {
-                console.warn('Ошибка парсинга JSON от AI', e);
-            }
-        }
+}
 
         /* ===== НОРМАЛИЗАЦИЯ КАТЕГОРИЙ ===== */
         const catAliases = {
@@ -1419,6 +1392,7 @@ async function editGoalName() {
     </script>
 </body>
 </html>
+
 
 
 
