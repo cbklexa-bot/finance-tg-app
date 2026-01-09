@@ -44,16 +44,18 @@ def chat_ai():
                     stats_summary = f"БАЛАНС: {inc - exp} | ДОХОД: {inc} | РАСХОД: {exp}"
                     lines = [f"- {t['created_at'][:10]}: {t['type']} | {t['category']} | {t['amount']} руб. ({t.get('description','')})" for t in res.data]
                     history_text = "\n".join(lines)
-            except Exception as e: print(f"DB Error: {e}")
+            except Exception as e: 
+                print(f"DB Error: {e}")
 
         # 2. ИНСТРУКЦИЯ С ТВОИМИ КАТЕГОРИЯМИ
         system_instruction = f"""
-        Ты — DeepSeek-V3, личный финансовый консультант. Твоя задача — вести учет и анализировать историю.
+        Ты — DeepSeek-V3, личный финансовый эксперт-ассистент. 
+        Твоя задача — вести учет и анализировать историю транзакций пользователя.
 
-        ДАННЫЕ ПОЛЬЗОВАТЕЛЯ:
+        ДАННЫЕ ПОЛЬЗОВАТЕЛЯ ИЗ БАЗЫ:
         {stats_summary}
         
-        ПОСЛЕДНИЕ ОПЕРАЦИИ:
+        ПОСЛЕДНИЕ ОПЕРАЦИИ (ДЛЯ АНАЛИЗА):
         {history_text}
 
         ТВОИ КАТЕГОРИИ РАСХОДОВ:
@@ -64,28 +66,47 @@ def chat_ai():
 
         ТВОИ ПРАВИЛА:
         1. Распознавай тип (expense/income) и категорию автоматически.
-        2. Если нужно записать, ОБЯЗАТЕЛЬНО используй формат:
+        2. Если нужно записать, ОБЯЗАТЕЛЬНО используй формат в конце сообщения:
         [JSON_DATA]{{"amount": число, "category": "название_категории", "type": "expense|income", "description": "описание"}}[/JSON_DATA]
-        3. Анализируй историю: если в категории "шопинг" много трат, посоветуй быть экономнее.
-        4. Отвечай кратко, но профессионально.
+        3. Будь профессиональным ассистентом: давай советы по экономии и анализируй дыры в бюджете.
+        4. НИКОГДА не выдумывай данные. Используй только список выше.
         """
 
-        # 3. ЗАПРОС К OPENROUTER (DEEPSEEK-V3)
+        # 3. СТРОГИЙ ЗАПРОС К OPENROUTER (ТОЛЬКО DEEPSEEK)
         headers = {
             "Authorization": f"Bearer {OR_KEY}",
             "Content-Type": "application/json",
-            "HTTP-Referer": "https://finance-tg-app.onrender.com"
+            "HTTP-Referer": "https://finance-tg-app.onrender.com",
+            "X-Title": "Finance Expert Bot"
         }
+        
         payload = {
             "model": "deepseek/deepseek-chat",
             "messages": [
                 {"role": "system", "content": system_instruction},
                 {"role": "user", "content": prompt}
             ],
-            "temperature": 0.1
+            "temperature": 0.1,
+            # ЗАПРЕЩАЕМ ГЕМЕНИ И ДРУГИЕ ПОДМЕНЫ:
+            "providers": {
+                "allow_fallbacks": False
+            },
+            "models": ["deepseek/deepseek-chat"]
         }
         
-        response = requests.post("https://openrouter.ai/api/v1/chat/completions", headers=headers, json=payload, timeout=45).json()
+        # Увеличиваем таймаут до 60 секунд для DeepSeek
+        response_raw = requests.post(
+            "https://openrouter.ai/api/v1/chat/completions", 
+            headers=headers, 
+            json=payload, 
+            timeout=60
+        )
+        
+        response = response_raw.json()
+        
+        if 'choices' not in response:
+            return jsonify({"choices": [{"message": {"content": "DeepSeek перегружен. Пожалуйста, попробуй через 30 секунд."}}]})
+            
         ai_message = response['choices'][0]['message']['content']
 
         # 4. АВТОЗАПИСЬ В БАЗУ
@@ -107,12 +128,14 @@ def chat_ai():
         return jsonify({"choices": [{"message": {"content": ai_message}}]})
 
     except Exception as e:
+        print(f"Global Error: {e}")
         return jsonify({"error": str(e)}), 500
 
 @bot.message_handler(commands=['start'])
 def start(message):
-    bot.send_message(message.chat.id, "🦁 Привет! Твой персональный эксперт на базе DeepSeek-V3 готов к работе.'.")
+    bot.send_message(message.chat.id, "🦁 Привет! Я твой личный финансовый аналитик на базе DeepSeek-V3. Я вижу твою историю и готов помогать.")
 
 if __name__ == "__main__":
-    threading.Thread(target=lambda: app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 10000))), daemon=True).start()
+    port = int(os.environ.get("PORT", 10000))
+    threading.Thread(target=lambda: app.run(host="0.0.0.0", port=port), daemon=True).start()
     bot.infinity_polling()
