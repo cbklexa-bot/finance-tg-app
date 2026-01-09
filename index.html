@@ -401,227 +401,416 @@
     <script>
         const tg = window.Telegram.WebApp;
         const { createClient } = supabase;
-        // Указываем ваши данные Supabase
         const _supabase = createClient('https://ereiiidezagburttpxtn.supabase.co', 'sb_publishable_YuQ8s49c1LvkCTmoBPQ0hA_7EJ3Z1cj');
         
-        // --- 1. ЖЕЛЕЗНОЕ ОПРЕДЕЛЕНИЕ USER ID ---
-        // Это решает проблему "амнезии" у ИИ при тестах в браузере
-        let userId;
-        if (tg.initDataUnsafe && tg.initDataUnsafe.user) {
-            userId = tg.initDataUnsafe.user.id.toString();
-        } else {
-            // Тестовый режим в браузере: сохраняем ID, чтобы он не менялся при F5
-            let storedId = localStorage.getItem('test_user_id');
-            if (!storedId) {
-                storedId = 'demo_user_' + Math.floor(Math.random() * 1000000);
-                localStorage.setItem('test_user_id', storedId);
-            }
-            userId = storedId;
-            console.log("Режим тестирования. Ваш ID:", userId);
-        }
-
-        // === ПЕРЕМЕННЫЕ ФИНАНСОВ ===
-        let db = []; // Массив транзакций
+       let userId = tg.initDataUnsafe?.user?.id?.toString() || 'user_demo';
+        let db = [];
         let budgets = JSON.parse(localStorage.getItem('fin_budgets_' + userId)) || [];
-        
-        let mode = 'exp';
-        let currentCat = '🛒';
-        let budSelectedCat = '🛒';
-        let editingId = null; 
-        let editingBudIdx = null;
-        let currentSlide = 0;
-        let touchStartX = 0;
 
-        // === ПЕРЕМЕННЫЕ БЛОКНОТА ===
+        // === ПЕРЕМЕННЫЕ БЛОКНОТА (ОБНОВЛЕНО) ===
         let tasks = [];
         let habits = [];
         let notes = [];
-        let goals_list = [];
-        let selectedGoalId = null;
+        let goals_list = []; // Массив для хранения ваших целей
+        let selectedGoalId = null; // ID цели, которую вы нажали (для пополнения/удаления)
         let editingNoteId = null;
+
+        let mode = 'exp', currentCat = '🛒', currentSlide = 0, touchStartX = 0, editingBudIdx = null, editingId = null;
+        let budSelectedCat = '🛒';
         let isListening = false;
 
-        // === КОНСТАНТЫ ===
         const catColors = { '🛒':'#ff453a', '🚗':'#ff9f0a', '🏠':'#30d158', '🛍️':'#0a84ff', '💊':'#bf5af2', '🎁':'#ff375f', '🎭':'#64d2ff', '📦':'#a1a1aa', '💵':'#30d158', '📈':'#0a84ff' };
         const cats = {
             exp: [{n:'Продукты', i:'🛒'}, {n:'Авто', i:'🚗'}, {n:'Жилье', i:'🏠'}, {n:'Шопинг', i:'🛍️'}, {n:'Аптека', i:'💊'}, {n:'Подарки', i:'🎁'}, {n:'Отдых', i:'🎭'}, {n:'Прочее', i:'📦'}],
             inc: [{n:'Зарплата', i:'💵'}, {n:'Инвест', i:'📈'}, {n:'Подарок', i:'🎁'}, {n:'Прочее', i:'📦'}]
         };
 
-        // ==========================================
-        //        ГЛАВНАЯ ФУНКЦИЯ AI (ИСПРАВЛЕНА)
-        // ==========================================
-        async function askAI() {
-            const input = document.getElementById('ai-input');
-            const chat = document.getElementById('ai-chat');
+        // === ЛОГИКА БЛОКНОТА ===
+        function switchNoteTab(tab) {
+            document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+            document.querySelectorAll('.note-view').forEach(v => v.classList.remove('active'));
+            document.getElementById('tab-'+tab).classList.add('active');
+            document.getElementById('view-'+tab).classList.add('active');
+            if(tab === 'cal') renderCalendar();
+        }
+
+        // --- Календарь ---
+        function renderCalendar() {
+            const container = document.getElementById('calendar-container');
+            const now = new Date();
+            const year = now.getFullYear();
+            const month = now.getMonth();
+            const firstDay = new Date(year, month, 1).getDay();
+            const daysInMonth = new Date(year, month + 1, 0).getDate();
             
-            if (!input || !chat) return;
-            const q = input.value.trim();
-            if (!q) return;
+            let html = `<div style="text-align:center; margin-bottom:10px; font-weight:800;">${now.toLocaleString('ru', {month: 'long'})} ${year}</div>`;
+            html += `<div class="calendar-grid">`;
+            const weekdays = ['Пн','Вт','Ср','Чт','Пт','Сб','Вс'];
+            weekdays.forEach(w => html += `<div class="cal-weekday">${w}</div>`);
+            
+            for(let i = 1; i < (firstDay || 7); i++) html += `<div></div>`;
+            
+            for(let d = 1; d <= daysInMonth; d++) {
+                const dateStr = `${year}-${String(month+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+                const isToday = new Date().toISOString().split('T')[0] === dateStr;
+                const hasTasks = tasks.some(t => t.date === dateStr);
+                html += `<div class="cal-day ${isToday?'today':''} ${hasTasks?'has-tasks':''}" onclick="filterTasksByDate('${dateStr}')">${d}</div>`;
+            }
+            html += `</div>`;
+            container.innerHTML = html;
+        }
 
-            // Выводим сообщение пользователя
-            chat.innerHTML += `<div class="user-msg">${q}</div>`;
-            input.value = '';
-
-            const tempId = 'ai-' + Date.now();
-            chat.innerHTML += `<div id="${tempId}" class="ai-msg">🤖 Думаю...</div>`;
-            chat.scrollTop = chat.scrollHeight;
-
-            try {
-                // Отправляем запрос на ваш Python-бэкенд (Render)
-                const response = await fetch('https://finance-tg-app.onrender.com/chat', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        prompt: q,
-                        user_id: userId, // Передаем стабильный ID!
-                        history: [] // Историю сервер теперь берет сам из базы
-                    })
-                });
-
-                if (!response.ok) throw new Error('Ошибка сервера: ' + response.status);
-
-                const raw = await response.json();
-                const content = raw?.choices?.[0]?.message?.content || '';
-
-                if (!content) {
-                    document.getElementById(tempId).innerText = '⚠️ Бот ничего не ответил.';
-                    return;
-                }
-
-                // 1. Убираем технические теги [JSON_DATA] из ответа
-                const cleanText = content.replace(/\[JSON_DATA\].*?\[\/JSON_DATA\]/gs, "").trim();
-                document.getElementById(tempId).innerText = cleanText || "✅ Готово!";
-
-                // 2. Если бот прислал команду записи, обновляем экран
-                if (content.includes("[JSON_DATA]")) {
-                    console.log("Бот внес изменения. Обновляем данные...");
-                    setTimeout(() => {
-                        syncFromCloud(); // Подтягиваем новые данные из базы
-                    }, 1500);
-                }
-
-            } catch (e) {
-                console.error(e);
-                document.getElementById(tempId).innerText = '⚠️ Ошибка связи с сервером. Проверьте интернет.';
-            } finally {
-                chat.scrollTop = chat.scrollHeight;
+        function filterTasksByDate(date) {
+            const filtered = tasks.filter(t => t.date === date);
+            const list = document.getElementById('selected-date-tasks');
+            if (filtered.length === 0) {
+                list.innerHTML = `<div style="padding:10px; font-size:12px; color:var(--text); text-align:center;">На ${date} дел нет</div>`;
+            } else {
+                list.innerHTML = `<h4 style="font-size:12px; margin-bottom:10px;">Задачи на ${date}:</h4>` + 
+                filtered.map(t => `<div class="task-item" style="margin-bottom:5px;">
+                    <div class="task-check ${t.done?'done':''}" onclick="toggleTask(${t.id})"></div>
+                    <div class="task-text ${t.done?'done':''}">${t.text}</div>
+                </div>`).join('');
             }
         }
 
-        // ==========================================
-        //           ФИНАНСОВАЯ ЛОГИКА
-        // ==========================================
-        
-        // Синхронизация финансов (Чтение)
+        // --- Задачи ---
+        function addTask() {
+            const txt = document.getElementById('task-in').value;
+            const date = document.getElementById('task-date').value;
+            if(!txt) return;
+            tasks.push({ id: Date.now(), text: txt, date: date, done: false });
+            document.getElementById('task-in').value = '';
+            saveNotebook(); renderTasks();
+        }
+
+        function toggleTask(id) {
+            const t = tasks.find(x => x.id === id);
+            if(t) { t.done = !t.done; saveNotebook(); renderTasks(); if(document.getElementById('view-cal').classList.contains('active')) renderCalendar(); }
+        }
+
+        function deleteTask(id) {
+            if(confirm('Удалить задачу?')) {
+                tasks = tasks.filter(x => x.id !== id);
+                saveNotebook(); renderTasks();
+            }
+        }
+
+        function renderTasks() {
+            tasks.sort((a,b) => (a.done === b.done) ? 0 : a.done ? 1 : -1);
+            document.getElementById('task-list').innerHTML = tasks.map(t => `
+                <div class="task-item">
+                    <div class="task-check ${t.done?'done':''}" onclick="toggleTask(${t.id})"></div>
+                    <div class="task-text ${t.done?'done':''}" onclick="deleteTask(${t.id})">
+                        ${t.text} <small style="display:block; font-weight:400; font-size:10px; color:var(--text);">${t.date||''}</small>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        // --- Привычки ---
+        function addHabit() {
+            const name = document.getElementById('habit-in').value;
+            if(!name) return;
+            habits.push({ id: Date.now(), name: name, history: [] });
+            document.getElementById('habit-in').value = '';
+            saveNotebook(); renderHabits();
+        }
+
+        function toggleHabit(id) {
+            const h = habits.find(x => x.id === id);
+            const today = new Date().toISOString().split('T')[0];
+            if(h.history.includes(today)) h.history = h.history.filter(d => d !== today);
+            else { h.history.push(today); tg.HapticFeedback.notificationOccurred('success'); }
+            saveNotebook(); renderHabits();
+        }
+
+        function deleteHabit(id) {
+             if(confirm('Удалить привычку?')) {
+                habits = habits.filter(x => x.id !== id);
+                saveNotebook(); renderHabits();
+             }
+        }
+
+        function renderHabits() {
+            const today = new Date().toISOString().split('T')[0];
+            document.getElementById('habit-list').innerHTML = habits.map(h => `
+                <div class="habit-card">
+                    <div style="font-weight:700; font-size:13px;">${h.name}</div>
+                    <div class="habit-circle ${h.history.includes(today)?'done':''}" onclick="toggleHabit(${h.id})">🔥</div>
+                    <div class="streak-count">Дней: ${h.history.length}</div>
+                    <div style="font-size:10px; color:var(--red); margin-top:5px;" onclick="deleteHabit(${h.id})">удалить</div>
+                </div>`).join('');
+        }
+
+        // --- Заметки ---
+        function openNoteModal(id = null) {
+            editingNoteId = id;
+            if(id) {
+                const n = notes.find(x => x.id === id);
+                document.getElementById('note-title').value = n.title;
+                document.getElementById('note-body').value = n.body;
+            } else {
+                document.getElementById('note-title').value = '';
+                document.getElementById('note-body').value = '';
+            }
+            document.getElementById('note-modal').style.display = 'flex';
+        }
+
+        function saveNote() {
+            const title = document.getElementById('note-title').value;
+            const body = document.getElementById('note-body').value;
+            if(!title && !body) return;
+            if(editingNoteId) {
+                const n = notes.find(x => x.id === editingNoteId);
+                n.title = title; n.body = body; n.date = new Date().toLocaleDateString();
+            } else {
+                notes.unshift({ id: Date.now(), title: title || 'Без названия', body: body, date: new Date().toLocaleDateString() });
+            }
+            document.getElementById('note-modal').style.display = 'none';
+            saveNotebook(); renderNotes();
+        }
+
+        function deleteNote(e, id) {
+            e.stopPropagation();
+            if(confirm('Удалить заметку?')) {
+                notes = notes.filter(x => x.id !== id);
+                saveNotebook(); renderNotes();
+            }
+        }
+
+        function renderNotes() {
+            document.getElementById('note-list').innerHTML = notes.map(n => `
+                <div class="note-card" onclick="openNoteModal(${n.id})">
+                    <div style="display:flex; justify-content:space-between;">
+                        <div class="note-head">${n.title}</div>
+                        <div style="color:var(--red); font-size:12px;" onclick="deleteNote(event, ${n.id})">✕</div>
+                    </div>
+                    <div class="note-preview">${n.body}</div>
+                    <div style="font-size:10px; color:var(--text); margin-top:5px;">${n.date}</div>
+                </div>
+            `).join('');
+        }
+
+        // --- Сохранение и Синхронизация Блокнота ---
+        async function cloudSaveNotebook() {
+            const notebookData = { tasks, habits, notes, goals };
+            const { error } = await _supabase.from('notebook').upsert({ id: userId, data: notebookData, updated_at: new Date() }, { onConflict: 'id' });
+        }
+
+         function saveNotebook() {
+             localStorage.setItem('fin_tasks_' + userId, JSON.stringify(tasks));
+             localStorage.setItem('fin_habits_' + userId, JSON.stringify(habits));
+             localStorage.setItem('fin_notes_' + userId, JSON.stringify(notes));
+             localStorage.setItem('fin_goals_' + userId, JSON.stringify(goals_list)); 
+             cloudSaveNotebook();
+        } 
+
+        function loadNotebook() {
+            const t = localStorage.getItem('fin_tasks_' + userId);
+    const h = localStorage.getItem('fin_habits_' + userId);
+    const n = localStorage.getItem('fin_notes_' + userId);
+    const g = localStorage.getItem('fin_goals_' + userId);
+    
+    if(t) tasks = JSON.parse(t);
+    if(h) habits = JSON.parse(h);
+    if(n) notes = JSON.parse(n);
+    // ИСПРАВЛЕНО: используем goals_list вместо goals
+    if(g) goals_list = JSON.parse(g); 
+    
+    renderTasks(); 
+    renderHabits(); 
+    renderNotes();
+    renderGoals(); // ОБЯЗАТЕЛЬНО: отрисовываем цели после загрузки
+}
+
+// 1. ЗАГРУЗКА ДАННЫХ ИЗ ОБЛАКА
+        async function syncNotebookFromCloud() {
+            try {
+                const { data } = await _supabase.from('notebook').select('data').eq('id', userId).single();
+                if (data && data.data) {
+                    tasks = data.data.tasks || [];
+                    habits = data.data.habits || [];
+                    notes = data.data.notes || [];
+                    goals_list = data.data.goals_list || []; 
+                    saveNotebook();
+                    renderTasks(); renderHabits(); renderNotes(); renderGoals();
+                }
+            } catch (e) { console.error("Ошибка загрузки:", e); }
+        }
+
+        // 2. ФУНКЦИЯ СОЗДАНИЯ ЦЕЛИ
+        async function addGoal() {
+            const titleIn = document.getElementById('goal-title');
+            const amountIn = document.getElementById('goal-amount');
+            const title = titleIn.value.trim();
+            const amount = parseFloat(amountIn.value);
+
+            if (!title || isNaN(amount) || amount <= 0) {
+                alert("Укажите название и сумму цели");
+                return;
+            }
+
+            const newGoal = {
+                id: Date.now().toString(),
+                title: title,
+                target: amount,
+                current: 0
+            };
+
+            goals_list.push(newGoal);
+            titleIn.value = '';
+            amountIn.value = '';
+
+            renderGoals();
+            await syncNotebookToCloud();
+            tg.HapticFeedback.notificationOccurred('success');
+        }
+
+        // 3. ОТРИСОВКА СПИСКА ЦЕЛЕЙ (ИСПРАВЛЕННАЯ ВЕРСИЯ)
+        function renderGoals() {
+            const list = document.getElementById('goal-list');
+            if (!list) return;
+            list.innerHTML = ''; // Очищаем список перед отрисовкой
+
+            if (!goals_list || goals_list.length === 0) {
+                list.innerHTML = '<div style="text-align:center; color:var(--text); padding:20px; font-size:12px;">Нет активных целей</div>';
+                return;
+            }
+
+            goals_list.forEach(g => {
+                const perc = Math.min(Math.round((g.current / g.target) * 100), 100);
+                const item = document.createElement('div');
+                
+                // Настраиваем внешний вид карточки
+                item.className = 'bento-item wide';
+                item.style.marginBottom = '12px';
+                item.style.cursor = 'pointer';
+                item.style.display = 'block'; // Гарантируем видимость
+                
+                // ПРИВЯЗЫВАЕМ КЛИК НАПРЯМУЮ
+                item.onclick = function() {
+                    openGoalAction(g.id);
+                };
+
+                item.innerHTML = `
+                    <div style="display:flex; justify-content:space-between; align-items:center; pointer-events:none;">
+                        <span style="font-weight:800; font-size:14px; color:var(--main);">${g.title}</span>
+                        <span style="color:var(--green); font-weight:800; font-size:12px;">${g.current.toLocaleString()} / ${g.target.toLocaleString()} ₽</span>
+                    </div>
+                    <div style="background:var(--btn-bg); height:8px; border-radius:4px; margin:10px 0; overflow:hidden; pointer-events:none;">
+                        <div style="width:${perc}%; height:100%; background:var(--green); transition:0.3s;"></div>
+                    </div>
+                    <div style="display:flex; justify-content:space-between; font-size:10px; color:var(--text); pointer-events:none;">
+                        <span>Выполнено: ${perc}%</span>
+                        <span>Осталось: ${(g.target - g.current).toLocaleString()} ₽</span>
+                    </div>
+                `;
+                list.appendChild(item);
+            });
+        }
+
+        // 4. ФУНКЦИИ УПРАВЛЕНИЯ (МЕНЮ)
+        function openGoalAction(id) {
+            selectedGoalId = id.toString();
+            const goal = goals_list.find(g => g.id === selectedGoalId);
+            if (goal) {
+                // Заполняем заголовок в модалке
+                const modalTitle = document.getElementById('modal-goal-title');
+                if(modalTitle) modalTitle.innerText = goal.title;
+                
+                // Показываем модалку
+                const modal = document.getElementById('goal-action-modal');
+                if(modal) modal.style.display = 'flex';
+            }
+        }
+
+        async function addMoneyToGoal() {
+            const amountInput = document.getElementById('add-goal-money');
+            const amount = parseFloat(amountInput.value);
+            if (isNaN(amount) || amount <= 0) return;
+
+            const goal = goals_list.find(g => g.id === selectedGoalId);
+            if (goal) {
+                goal.current += amount; // Плюсуем деньги
+                amountInput.value = '';
+                closeGoalActionModal();
+                renderGoals();
+                await syncNotebookToCloud();
+                tg.HapticFeedback.notificationOccurred('success');
+            }
+        }
+
+        async function editGoalName() {
+            const goal = goals_list.find(g => g.id === selectedGoalId);
+            if (!goal) return;
+            const newName = prompt("Новое название цели:", goal.title);
+            if (newName && newName.trim() !== "") {
+                goal.title = newName;
+                renderGoals();
+                await syncNotebookToCloud();
+            }
+        }
+
+        async function deleteGoalReal() {
+            if (!confirm("Удалить эту цель?")) return;
+            goals_list = goals_list.filter(g => g.id !== selectedGoalId);
+            closeGoalActionModal();
+            renderGoals();
+            await syncNotebookToCloud();
+        }
+
+        function closeGoalActionModal() {
+            const modal = document.getElementById('goal-action-modal');
+            if(modal) modal.style.display = 'none';
+        }
+
+        // === СТАРЫЙ ФУНКЦИОНАЛ ===
+        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+        let recognition = null;
+        if (SpeechRecognition) {
+            recognition = new SpeechRecognition();
+            recognition.lang = 'ru-RU';
+            recognition.interimResults = false; 
+            recognition.onstart = () => { isListening = true; document.getElementById('mic-btn').classList.add('active'); tg.HapticFeedback.impactOccurred('medium'); };
+            recognition.onend = () => { isListening = false; document.getElementById('mic-btn').classList.remove('active'); };
+            recognition.onresult = (event) => {
+                const text = event.results[0][0].transcript;
+                if (text.trim().length > 0) { document.getElementById('ai-input').value = text; askAI(); }
+            };
+        }
+
+        function toggleVoice() { if (!recognition) return alert("Голосовой ввод не поддерживается"); if (isListening) recognition.stop(); else recognition.start(); }
+
+        function go(p) {
+            document.querySelectorAll('.page').forEach(e => e.classList.remove('active'));
+            document.querySelectorAll('.n-item').forEach(e => e.classList.remove('active'));
+            document.getElementById('p-'+p).classList.add('active');
+            const idx = ['home', 'an', 'bud', 'note', 'ai'].indexOf(p);
+            document.querySelectorAll('.n-item')[idx].classList.add('active');
+            if(p !== 'note') updateUI();
+            if(p === 'note' && document.getElementById('tab-cal').classList.contains('active')) renderCalendar();
+        }
+
         async function syncFromCloud() {
-            // Сначала грузим из локального кеша для скорости
             const local = localStorage.getItem('fin_cache_' + userId);
             if (local) { db = JSON.parse(local); updateUI(); }
-            
             try {
-                // ВАЖНО: Читаем таблицу 'transactions', куда пишет БОТ
-                const { data: transData, error } = await _supabase
-                    .from('transactions')
-                    .select('*')
-                    .eq('user_id', userId)
-                    .order('created_at', { ascending: false })
-                    .limit(500); // Берем последние 500 записей
-
-                if (transData) {
-                    // Преобразуем формат базы в формат приложения
-                    db = transData.map(t => ({
-                        id: t.id,
-                        t: t.type === 'income' ? 'inc' : 'exp',
-                        c: getIconForCat(t.category), // Превращаем слово "продукты" в иконку 🛒
-                        s: t.amount,
-                        n: t.description || t.category,
-                        d: t.created_at.split('T')[0]
-                    }));
-                    
-                    updateUI();
-                    // Обновляем кеш
-                    localStorage.setItem('fin_cache_' + userId, JSON.stringify(db));
-                }
-            } catch(e) { console.error("Ошибка синхронизации:", e); }
+                const { data } = await _supabase.from('finance').select('data').eq('id', userId).maybeSingle();
+                if (data?.data) { db = data.data; updateUI(); }
+            } catch(e) {}
         }
 
-        // Помощник: Слово -> Иконка
-        function getIconForCat(name) {
-            if (!name) return '📦';
-            const lower = name.toLowerCase();
-            if (lower.includes('продукт') || lower.includes('еда')) return '🛒';
-            if (lower.includes('авто') || lower.includes('машин') || lower.includes('бензин')) return '🚗';
-            if (lower.includes('жил') || lower.includes('дом') || lower.includes('коммун')) return '🏠';
-            if (lower.includes('шопинг') || lower.includes('одежд')) return '🛍️';
-            if (lower.includes('аптек') || lower.includes('лекар')) return '💊';
-            if (lower.includes('подар')) return '🎁';
-            if (lower.includes('отдых') || lower.includes('кафе')) return '🎭';
-            if (lower.includes('зарплат')) return '💵';
-            if (lower.includes('инвест')) return '📈';
-            return '📦';
+        async function cloudSave() {
+            localStorage.setItem('fin_cache_' + userId, JSON.stringify(db));
+            localStorage.setItem('fin_budgets_' + userId, JSON.stringify(budgets));
+            await _supabase.from('finance').upsert({ id: userId, data: db, updated_at: new Date().toISOString() });
         }
 
-        // Сохранение новой записи (ручное)
-        async function save() {
-            const s = document.getElementById('sum'), n = document.getElementById('note'), d = document.getElementById('date-picker');
-            if(!s.value) return;
-            
-            // 1. Определяем данные
-            const amount = parseFloat(s.value);
-            const type = mode === 'inc' ? 'income' : 'expense';
-            // Находим название категории по иконке
-            const catObj = cats[mode].find(c => c.i === currentCat);
-            const catName = catObj ? catObj.n.toLowerCase() : 'прочее';
-
-            // 2. Пишем СРАЗУ в Supabase (как бот)
-            const { error } = await _supabase.from('transactions').insert({
-                user_id: userId,
-                amount: amount,
-                category: catName,
-                type: type,
-                description: n.value || 'Ручная запись'
-            });
-
-            if (!error) {
-                s.value = ''; n.value = ''; 
-                if(window.tg) tg.HapticFeedback.notificationOccurred('success');
-                syncFromCloud(); // Обновляем список
-            } else {
-                alert("Ошибка сохранения");
-            }
-        }
-        
-        // Редактирование и удаление (Через Supabase)
-        async function deleteTransaction() {
-            if(!editingId) return;
-            // Удаляем из базы
-            await _supabase.from('transactions').delete().eq('id', editingId);
-            closeModal();
-            syncFromCloud();
-        }
-
-        async function confirmEdit() {
-            if(!editingId) return;
-            const newSum = parseFloat(document.getElementById('edit-sum').value);
-            const newNote = document.getElementById('edit-note').value;
-            
-            await _supabase.from('transactions').update({
-                amount: newSum,
-                description: newNote
-            }).eq('id', editingId);
-            
-            closeModal();
-            syncFromCloud();
-        }
-
-        // Обновление интерфейса
         function updateUI() {
             const total = db.reduce((a,i) => a + (i.t === 'inc' ? i.s : -i.s), 0);
             document.getElementById('bal').innerText = total.toLocaleString() + ' ₽';
-            renderCats(); 
-            renderHistory(); 
-            renderBudget();
+            renderCats(); renderHistory(); renderBudget();
             if(document.getElementById('p-an').classList.contains('active')) drawCharts();
         }
 
@@ -629,34 +818,27 @@
             document.getElementById('cat-list').innerHTML = cats[mode].map(c => `<div class="cat-item ${currentCat === c.i ? 'active' : ''}" onclick="currentCat='${c.i}'; renderCats();"><div class="cat-icon">${c.i}</div><span class="cat-name">${c.n}</span></div>`).join('');
         }
 
-        function renderHistory() {
-            document.getElementById('h-list-full').innerHTML = db.map(i => `<div class="h-item" onclick="openEdit('${i.id}')"><div><span style="font-size:18px; margin-right:8px;">${i.c}</span><b>${i.n}</b><br><small style="color:var(--text)">${i.d}</small></div><div class="h-amount" style="color:${i.t==='exp'?'var(--red)':'var(--green)'}">${i.s.toLocaleString()} ₽</div></div>`).join('');
+        function renderBudCatList() {
+            document.getElementById('bud-cat-list').innerHTML = cats.exp.map(c => `
+                <div class="bud-cat-item ${budSelectedCat === c.i ? 'active' : ''}" onclick="budSelectedCat='${c.i}'; renderBudCatList();">
+                    ${c.i}
+                </div>`).join('');
         }
-        
-        function openEdit(id) { 
-            editingId = id; 
-            const item = db.find(x => x.id == id); // Нестрогое равенство, т.к. ID может быть строкой UUID
-            if(item) {
-                document.getElementById('edit-sum').value = item.s; 
-                document.getElementById('edit-note').value = item.n; 
-                document.getElementById('edit-modal').style.display = 'flex'; 
-            }
-        }
-        function closeModal() { document.getElementById('edit-modal').style.display = 'none'; }
-        function setMode(m) { mode = m; currentCat = cats[m][0].i; renderCats(); document.getElementById('btn-exp').style.background = m === 'exp' ? 'var(--blue)' : 'transparent'; document.getElementById('btn-inc').style.background = m === 'inc' ? 'var(--blue)' : 'transparent'; }
-        function toggleBlur() { document.getElementById('bal').classList.toggle('blurred'); if(window.tg) tg.HapticFeedback.impactOccurred('light'); }
 
-        // ==========================================
-        //           БЮДЖЕТЫ
-        // ==========================================
+        async function save() {
+            const s = document.getElementById('sum'), n = document.getElementById('note'), d = document.getElementById('date-picker');
+            if(!s.value) return;
+            db.unshift({ id: Date.now(), t: mode, c: currentCat, s: parseFloat(s.value), n: n.value || 'Запись', d: d.value });
+            updateUI(); await cloudSave(); s.value = ''; n.value = ''; tg.HapticFeedback.notificationOccurred('success');
+        }
+
         function renderBudget() {
             const list = document.getElementById('budget-list');
             const curMonth = new Date().toISOString().slice(0, 7);
             let tLimit = 0, tSpent = 0;
 
             list.innerHTML = budgets.map((b, i) => {
-                const icon = getIconForCat(b.cat); // Используем маппинг
-                const spent = db.filter(t => t.t === 'exp' && t.c === icon && t.d.startsWith(curMonth)).reduce((a,c)=>a+c.s, 0);
+                const spent = db.filter(t => t.t === 'exp' && t.c === b.cat && t.d.startsWith(curMonth)).reduce((a,c)=>a+c.s, 0);
                 tLimit += b.limit; tSpent += spent; 
                 const perc = Math.min((spent/b.limit)*100, 100);
                 return `<div class="bud-progress-card" onclick="openBudModal(${i})">
@@ -674,8 +856,7 @@
             document.getElementById('total-bud-perc').innerText = totalPerc + '%';
             document.getElementById('total-bud-chart').style.strokeDasharray = `${Math.min(totalPerc, 100)} 100`;
         }
-        
-        // Функции модалки бюджета
+
         function openBudModal(idx = null) { 
             editingBudIdx = idx; 
             if(idx !== null) { 
@@ -691,229 +872,93 @@
             renderBudCatList();
             document.getElementById('budget-modal').style.display = 'flex'; 
         }
+
         function closeBudModal() { document.getElementById('budget-modal').style.display = 'none'; }
-        function renderBudCatList() { document.getElementById('bud-cat-list').innerHTML = cats.exp.map(c => `<div class="bud-cat-item ${budSelectedCat === c.i ? 'active' : ''}" onclick="budSelectedCat='${c.i}'; renderBudCatList();">${c.i}</div>`).join(''); }
         
         function addBudget() { 
             const n = document.getElementById('new-bud-name').value, v = parseFloat(document.getElementById('new-bud-val').value); 
             if(!n || isNaN(v)) return;
-            const catName = cats.exp.find(c => c.i === budSelectedCat)?.n.toLowerCase() || 'прочее'; // Сохраняем имя категории для совместимости
-            const data = {name: n, limit: v, cat: catName};
-            
+            const data = {name: n, limit: v, cat: budSelectedCat};
             if(editingBudIdx !== null) budgets[editingBudIdx] = data; else budgets.push(data); 
-            closeBudModal(); updateUI(); saveNotebook(); 
-        }
-        function deleteBudgetReal() { budgets.splice(editingBudIdx, 1); closeBudModal(); updateUI(); saveNotebook(); }
-
-
-        // ==========================================
-        //           БЛОКНОТ (Task, Habit, Note, Goal)
-        // ==========================================
-        
-        // Синхронизация Блокнота
-        async function syncNotebookToCloud() {
-            const dataToSave = { tasks, habits, notes, goals_list };
-            await _supabase.from('notebook').upsert({ id: userId, data: dataToSave, updated_at: new Date() });
-        }
-        
-        async function syncNotebookFromCloud() {
-            const { data } = await _supabase.from('notebook').select('data').eq('id', userId).maybeSingle();
-            if (data?.data) {
-                tasks = data.data.tasks || [];
-                habits = data.data.habits || [];
-                notes = data.data.notes || [];
-                goals_list = data.data.goals_list || [];
-                saveNotebook(false); // Сохраняем локально без отправки обратно
-                renderAllNotebook();
-            }
-        }
-        
-        function saveNotebook(push = true) {
-             localStorage.setItem('fin_tasks_' + userId, JSON.stringify(tasks));
-             localStorage.setItem('fin_habits_' + userId, JSON.stringify(habits));
-             localStorage.setItem('fin_notes_' + userId, JSON.stringify(notes));
-             localStorage.setItem('fin_goals_' + userId, JSON.stringify(goals_list));
-             localStorage.setItem('fin_budgets_' + userId, JSON.stringify(budgets));
-             if(push) syncNotebookToCloud();
-        } 
-        
-        function loadNotebook() {
-            const t = localStorage.getItem('fin_tasks_' + userId);
-            const h = localStorage.getItem('fin_habits_' + userId);
-            const n = localStorage.getItem('fin_notes_' + userId);
-            const g = localStorage.getItem('fin_goals_' + userId);
-            if(t) tasks = JSON.parse(t);
-            if(h) habits = JSON.parse(h);
-            if(n) notes = JSON.parse(n);
-            if(g) goals_list = JSON.parse(g);
-            renderAllNotebook();
-        }
-        
-        function renderAllNotebook() {
-            renderTasks(); renderHabits(); renderNotes(); renderGoals();
+            closeBudModal(); updateUI(); cloudSave(); 
         }
 
-        // --- Календарь ---
-        function renderCalendar() {
-            const container = document.getElementById('calendar-container');
-            const now = new Date();
-            const year = now.getFullYear();
-            const month = now.getMonth();
-            const firstDay = new Date(year, month, 1).getDay();
-            const daysInMonth = new Date(year, month + 1, 0).getDate();
-            
-            let html = `<div style="text-align:center; margin-bottom:10px; font-weight:800;">${now.toLocaleString('ru', {month: 'long'})} ${year}</div>`;
-            html += `<div class="calendar-grid">`;
-            const weekdays = ['Пн','Вт','Ср','Чт','Пт','Сб','Вс'];
-            weekdays.forEach(w => html += `<div class="cal-weekday">${w}</div>`);
-            for(let i = 1; i < (firstDay || 7); i++) html += `<div></div>`;
-            for(let d = 1; d <= daysInMonth; d++) {
-                const dateStr = `${year}-${String(month+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
-                const isToday = new Date().toISOString().split('T')[0] === dateStr;
-                const hasTasks = tasks.some(t => t.date === dateStr);
-                html += `<div class="cal-day ${isToday?'today':''} ${hasTasks?'has-tasks':''}" onclick="filterTasksByDate('${dateStr}')">${d}</div>`;
-            }
-            html += `</div>`;
-            container.innerHTML = html;
-        }
+        function deleteBudgetReal() { budgets.splice(editingBudIdx, 1); closeBudModal(); updateUI(); cloudSave(); }
 
-        function filterTasksByDate(date) {
-            const filtered = tasks.filter(t => t.date === date);
-            const list = document.getElementById('selected-date-tasks');
-            if (filtered.length === 0) list.innerHTML = `<div style="padding:10px; font-size:12px; color:var(--text); text-align:center;">На ${date} дел нет</div>`;
-            else list.innerHTML = `<h4 style="font-size:12px; margin-bottom:10px;">Задачи на ${date}:</h4>` + filtered.map(t => `<div class="task-item" style="margin-bottom:5px;"><div class="task-check ${t.done?'done':''}" onclick="toggleTask(${t.id})"></div><div class="task-text ${t.done?'done':''}">${t.text}</div></div>`).join('');
-        }
-
-        // --- Задачи ---
-        function addTask() {
-            const txt = document.getElementById('task-in').value, date = document.getElementById('task-date').value;
-            if(!txt) return;
-            tasks.push({ id: Date.now(), text: txt, date: date, done: false });
-            document.getElementById('task-in').value = '';
-            saveNotebook(); renderTasks();
-        }
-        function toggleTask(id) { const t = tasks.find(x => x.id === id); if(t) { t.done = !t.done; saveNotebook(); renderTasks(); if(document.getElementById('view-cal').classList.contains('active')) renderCalendar(); } }
-        function deleteTask(id) { if(confirm('Удалить?')) { tasks = tasks.filter(x => x.id !== id); saveNotebook(); renderTasks(); } }
-        function renderTasks() {
-            tasks.sort((a,b) => (a.done === b.done) ? 0 : a.done ? 1 : -1);
-            document.getElementById('task-list').innerHTML = tasks.map(t => `<div class="task-item"><div class="task-check ${t.done?'done':''}" onclick="toggleTask(${t.id})"></div><div class="task-text ${t.done?'done':''}" onclick="deleteTask(${t.id})">${t.text} <small style="display:block; font-weight:400; font-size:10px; color:var(--text);">${t.date||''}</small></div></div>`).join('');
-        }
-
-        // --- Привычки ---
-        function addHabit() { const name = document.getElementById('habit-in').value; if(!name) return; habits.push({ id: Date.now(), name: name, history: [] }); document.getElementById('habit-in').value = ''; saveNotebook(); renderHabits(); }
-        function toggleHabit(id) { const h = habits.find(x => x.id === id); const today = new Date().toISOString().split('T')[0]; if(h.history.includes(today)) h.history = h.history.filter(d => d !== today); else { h.history.push(today); if(window.tg) tg.HapticFeedback.notificationOccurred('success'); } saveNotebook(); renderHabits(); }
-        function deleteHabit(id) { if(confirm('Удалить?')) { habits = habits.filter(x => x.id !== id); saveNotebook(); renderHabits(); } }
-        function renderHabits() { const today = new Date().toISOString().split('T')[0]; document.getElementById('habit-list').innerHTML = habits.map(h => `<div class="habit-card"><div style="font-weight:700; font-size:13px;">${h.name}</div><div class="habit-circle ${h.history.includes(today)?'done':''}" onclick="toggleHabit(${h.id})">🔥</div><div class="streak-count">Дней: ${h.history.length}</div><div style="font-size:10px; color:var(--red); margin-top:5px;" onclick="deleteHabit(${h.id})">удалить</div></div>`).join(''); }
-
-        // --- Заметки ---
-        function openNoteModal(id = null) { editingNoteId = id; if(id) { const n = notes.find(x => x.id === id); document.getElementById('note-title').value = n.title; document.getElementById('note-body').value = n.body; } else { document.getElementById('note-title').value = ''; document.getElementById('note-body').value = ''; } document.getElementById('note-modal').style.display = 'flex'; }
-        function saveNote() { const title = document.getElementById('note-title').value, body = document.getElementById('note-body').value; if(!title && !body) return; if(editingNoteId) { const n = notes.find(x => x.id === editingNoteId); n.title = title; n.body = body; n.date = new Date().toLocaleDateString(); } else { notes.unshift({ id: Date.now(), title: title || 'Без названия', body: body, date: new Date().toLocaleDateString() }); } document.getElementById('note-modal').style.display = 'none'; saveNotebook(); renderNotes(); }
-        function deleteNote(e, id) { e.stopPropagation(); if(confirm('Удалить?')) { notes = notes.filter(x => x.id !== id); saveNotebook(); renderNotes(); } }
-        function renderNotes() { document.getElementById('note-list').innerHTML = notes.map(n => `<div class="note-card" onclick="openNoteModal(${n.id})"><div style="display:flex; justify-content:space-between;"><div class="note-head">${n.title}</div><div style="color:var(--red); font-size:12px;" onclick="deleteNote(event, ${n.id})">✕</div></div><div class="note-preview">${n.body}</div><div style="font-size:10px; color:var(--text); margin-top:5px;">${n.date}</div></div>`).join(''); }
-
-        // --- Цели ---
-        function addGoal() {
-            const title = document.getElementById('goal-title').value;
-            const amount = parseFloat(document.getElementById('goal-amount').value);
-            if (!title || !amount) return;
-            goals_list.push({ id: Date.now().toString(), title: title, target: amount, current: 0 });
-            document.getElementById('goal-title').value = ''; document.getElementById('goal-amount').value = '';
-            renderGoals(); saveNotebook();
-        }
-        function renderGoals() {
-            const list = document.getElementById('goal-list'); if(!list) return; list.innerHTML = '';
-            if (!goals_list.length) { list.innerHTML = '<div style="text-align:center; color:var(--text); padding:20px; font-size:12px;">Нет целей</div>'; return; }
-            goals_list.forEach(g => {
-                const perc = Math.min(Math.round((g.current / g.target) * 100), 100);
-                list.innerHTML += `<div class="goal-card" onclick="openGoalAction('${g.id}')">
-                    <div style="display:flex; justify-content:space-between; align-items:center;"><span style="font-weight:800; font-size:14px;">${g.title}</span><span style="color:var(--green); font-weight:800; font-size:12px;">${g.current}/${g.target}</span></div>
-                    <div style="background:var(--btn-bg); height:8px; border-radius:4px; margin:10px 0; overflow:hidden;"><div style="width:${perc}%; height:100%; background:var(--green);"></div></div>
-                    <div style="display:flex; justify-content:space-between; font-size:10px; color:var(--text);"><span>${perc}%</span><span>Ост: ${g.target - g.current}</span></div></div>`;
-            });
-        }
-        function openGoalAction(id) { selectedGoalId = id; const g = goals_list.find(x => x.id === id); if(g) { document.getElementById('modal-goal-title').innerText = g.title; document.getElementById('goal-action-modal').style.display = 'flex'; } }
-        function closeGoalActionModal() { document.getElementById('goal-action-modal').style.display = 'none'; }
-        function addMoneyToGoal() { const val = parseFloat(document.getElementById('add-goal-money').value); const g = goals_list.find(x => x.id === selectedGoalId); if(g && val) { g.current += val; closeGoalActionModal(); renderGoals(); saveNotebook(); } }
-        function deleteGoalReal() { if(confirm("Удалить?")) { goals_list = goals_list.filter(g => g.id !== selectedGoalId); closeGoalActionModal(); renderGoals(); saveNotebook(); } }
-        function editGoalName() { const g = goals_list.find(x => x.id === selectedGoalId); const nn = prompt("Новое имя", g.title); if(nn) { g.title = nn; renderGoals(); saveNotebook(); } }
-
-
-        // ==========================================
-        //         ГРАФИКИ И НАВИГАЦИЯ
-        // ==========================================
-        function go(p) {
-            document.querySelectorAll('.page').forEach(e => e.classList.remove('active'));
-            document.querySelectorAll('.n-item').forEach(e => e.classList.remove('active'));
-            document.getElementById('p-'+p).classList.add('active');
-            const map = {'home':0, 'an':1, 'bud':2, 'note':3, 'ai':4};
-            if(map[p]!==undefined) document.querySelectorAll('.n-item')[map[p]].classList.add('active');
-            if(p !== 'note') updateUI();
-            if(p === 'note' && document.getElementById('tab-cal').classList.contains('active')) renderCalendar();
-        }
-        
-        function switchNoteTab(tab) {
-            document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
-            document.querySelectorAll('.note-view').forEach(v => v.classList.remove('active'));
-            document.getElementById('tab-'+tab).classList.add('active');
-            document.getElementById('view-'+tab).classList.add('active');
-            if(tab === 'cal') renderCalendar();
-        }
-
-        // Графики (Day, Week, Month)
-        function drawCharts() { 
-            document.getElementById('chart-slider').style.transform = `translateX(-${currentSlide * 100}%)`;
-            document.querySelectorAll('.dot').forEach((d, i) => d.classList.toggle('active', i === currentSlide));
-            if(currentSlide === 0) renderDayChart(); 
-            if(currentSlide === 1) renderWeekChart(); 
-            if(currentSlide === 2) renderMonthChart();
-        }
-        
+        // Графики
         function renderDayChart() {
             const chart = document.getElementById('day-chart');
             const today = new Date().toISOString().split('T')[0];
-            const tExp = db.filter(i => i.t === 'exp' && i.d === today);
-            const total = tExp.reduce((a, b) => a + b.s, 0);
-            if (!total) { chart.innerHTML = `<circle cx="21" cy="21" r="15.9" fill="none" stroke="var(--border)" stroke-width="3"/><text x="21" y="21" text-anchor="middle" dy=".3em" fill="var(--text)" font-size="4">0 ₽</text>`; return; }
-            const grp = {}; tExp.forEach(i => grp[i.c] = (grp[i.c] || 0) + i.s);
-            let off = 0, html = '';
-            for(let cat in grp) {
-                const p = (grp[cat] / total) * 100;
-                html += `<circle cx="21" cy="21" r="15.9" fill="none" stroke="${catColors[cat] || 'var(--blue)'}" stroke-width="5" stroke-dasharray="${p} ${100 - p}" stroke-dashoffset="${-off}"></circle>`;
-                off += p;
-            }
+            const todayExp = db.filter(i => i.t === 'exp' && i.d === today);
+            const total = todayExp.reduce((a, b) => a + b.s, 0);
+            if (total === 0) { chart.innerHTML = `<circle cx="21" cy="21" r="15.9" fill="transparent" stroke="var(--border)" stroke-width="3"/><text x="21" y="21" text-anchor="middle" dy=".3em" fill="var(--text)" font-size="4">0 ₽</text>`; return; }
+            const catSums = {}; todayExp.forEach(i => catSums[i.c] = (catSums[i.c] || 0) + i.s);
+            let offset = 0, html = '';
+            Object.entries(catSums).forEach(([cat, sum]) => {
+                const percent = (sum / total) * 100;
+                html += `<circle cx="21" cy="21" r="15.9" fill="transparent" stroke="${catColors[cat] || 'var(--blue)'}" stroke-width="5" stroke-dasharray="${percent} ${100 - percent}" stroke-dashoffset="${-offset}" />`;
+                offset += percent;
+            });
             html += `<text x="21" y="21" text-anchor="middle" dy=".3em" fill="var(--main)" font-size="5" font-weight="900">${Math.round(total)} ₽</text>`;
             chart.innerHTML = html;
         }
 
         function renderWeekChart() {
             const svg = document.getElementById('week-chart');
+            const days = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'];
+            const weekSums = new Array(7).fill(0);
             const now = new Date();
-            const curIdx = now.getDay() === 0 ? 6 : now.getDay() - 1;
-            const mon = new Date(now); mon.setDate(now.getDate() - curIdx);
-            let html = '';
-            const sums = [];
+            const currentDayIdx = now.getDay() === 0 ? 6 : now.getDay() - 1;
+            const monday = new Date(now); monday.setDate(now.getDate() - currentDayIdx);
             for(let i=0; i<7; i++) {
-                const d = new Date(mon); d.setDate(mon.getDate()+i);
+                const d = new Date(monday); d.setDate(monday.getDate() + i);
                 const ds = d.toISOString().split('T')[0];
-                const s = db.filter(x => x.t === 'exp' && x.d === ds).reduce((a,b)=>a+b.s,0);
-                sums.push(s);
+                weekSums[i] = db.filter(item => item.t === 'exp' && item.d === ds).reduce((a, b) => a + b.s, 0);
             }
-            const max = Math.max(...sums, 1000) * 1.3;
-            const days = ['Пн','Вт','Ср','Чт','Пт','Сб','Вс'];
-            sums.forEach((v, i) => {
+            const max = Math.max(...weekSums, 1000) * 1.3;
+            svg.innerHTML = weekSums.map((v, i) => {
                 const h = (v/max)*120; const x = 30 + i*40; const y = 140-h;
-                html += `<text x="${x+10}" y="${y-8}" text-anchor="middle" fill="var(--main)" font-size="7">${v>0?Math.round(v):''}</text><rect x="${x}" y="${y}" width="20" height="${h}" rx="6" fill="${i===curIdx?'var(--blue)':'var(--btn-bg)'}"/><text x="${x+10}" y="160" text-anchor="middle" fill="var(--text)" font-size="9">${days[i]}</text>`;
-            });
-            svg.innerHTML = html;
+                return `<text x="${x+10}" y="${y-8}" text-anchor="middle" fill="var(--main)" font-size="7">${v > 0 ? Math.round(v) : ''}</text>
+                        <rect x="${x}" y="${y}" width="20" height="${h}" rx="6" fill="${i === currentDayIdx ? 'var(--blue)' : 'var(--btn-bg)'}"/>
+                        <text x="${x+10}" y="160" text-anchor="middle" fill="var(--text)" font-size="9">${days[i]}</text>`;
+            }).join('');
         }
 
         function renderMonthChart() {
-            // (Упрощенная версия для экономии места, но рабочая)
             const svg = document.getElementById('month-chart');
-            svg.innerHTML = '<text x="160" y="90" text-anchor="middle" fill="var(--text)">График месяца</text>';
+            const pointsCount = 6; const daysPerBlock = 5; 
+            const sums = new Array(pointsCount).fill(0); const labels = new Array(pointsCount).fill('');
+            const now = new Date(); now.setHours(23, 59, 59, 999);
+            for(let i = 0; i < pointsCount; i++) {
+                const offset = pointsCount - 1 - i; 
+                const minDaysAgo = offset * daysPerBlock; const maxDaysAgo = (offset + 1) * daysPerBlock; 
+                const labelDate = new Date(); labelDate.setDate(now.getDate() - minDaysAgo);
+                labels[i] = `${String(labelDate.getDate()).padStart(2,'0')}.${String(labelDate.getMonth()+1).padStart(2,'0')}`;
+                sums[i] = db.filter(item => {
+                    if (item.t !== 'exp') return false;
+                    const diffDays = (now - new Date(item.d)) / (1000 * 60 * 60 * 24);
+                    return diffDays >= minDaysAgo && diffDays < maxDaysAgo;
+                }).reduce((a, b) => a + b.s, 0);
+            }
+            const max = Math.max(...sums, 1000) * 1.3;
+            const points = sums.map((v, i) => ({ x: 40 + i * 48, y: 140 - (v / max) * 100 }));
+            const linePath = points.map((p, i) => (i === 0 ? 'M' : 'L') + `${p.x},${p.y}`).join(' ');
+            const areaPath = linePath + ` L${points[points.length-1].x},140 L${points[0].x},140 Z`;
+
+            svg.innerHTML = `<defs><linearGradient id="gm" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="var(--blue)" stop-opacity="0.3"/><stop offset="100%" stop-color="transparent"/></linearGradient></defs>
+                <path d="${areaPath}" fill="url(#gm)" />
+                <path d="${linePath}" fill="none" stroke="var(--blue)" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+                ${points.map((p, i) => `<circle cx="${p.x}" cy="${p.y}" r="4" fill="var(--card)" stroke="var(--blue)" stroke-width="2"/>
+                <text x="${p.x}" y="${p.y-12}" text-anchor="middle" fill="var(--main)" font-size="8" font-weight="900">${sums[i] > 0 ? Math.round(sums[i]) : ''}</text>
+                <text x="${p.x}" y="165" text-anchor="middle" fill="var(--text)" font-size="8">${labels[i]}</text>`).join('')}`;
         }
 
-        // Свайпы графиков
+        function drawCharts() {
+            document.getElementById('chart-slider').style.transform = `translateX(-${currentSlide * 100}%)`;
+            document.querySelectorAll('.dot').forEach((d, i) => d.classList.toggle('active', i === currentSlide));
+            if(currentSlide === 0) renderDayChart(); if(currentSlide === 1) renderWeekChart(); if(currentSlide === 2) renderMonthChart();
+        }
+
         function tS(e) { touchStartX = e.changedTouches[0].screenX; }
         function tE(e) {
             let x = e.changedTouches[0].screenX;
@@ -922,15 +967,286 @@
             drawCharts();
         }
 
-        // ==========================================
-        //           ЗАПУСК И ПОДПИСКА
-        // ==========================================
-        
-        async function checkSubscription() {
-            // Простая заглушка подписки, чтобы не блокировать работу
-            // Можно раскомментировать реальную логику, если нужно
-            return; 
+        function renderHistory() {
+            document.getElementById('h-list-full').innerHTML = db.map(i => `<div class="h-item" onclick="openEdit(${i.id})"><div><span style="font-size:18px; margin-right:8px;">${i.c}</span><b>${i.n}</b><br><small style="color:var(--text)">${i.d}</small></div><div class="h-amount" style="color:${i.t==='exp'?'var(--red)':'var(--green)'}">${i.s.toLocaleString()} ₽</div></div>`).join('');
         }
+
+async function askAI() {
+    const input = document.getElementById('ai-input');
+    const chat = document.getElementById('ai-chat');
+    const q = input.value.trim();
+    if (!q) return;
+
+    chat.innerHTML += `<div class="user-msg">${q}</div>`;
+    input.value = '';
+
+    const tempId = 'ai-' + Date.now();
+    chat.innerHTML += `<div id="${tempId}" class="ai-msg">🤖 Думаю и анализирую…</div>`;
+    chat.scrollTop = chat.scrollHeight;
+
+    try {
+        const response = await fetch('https://finance-tg-app.onrender.com/chat', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                prompt: q,
+                user_id: userId, // <--- ВОТ СЮДА ДОБАВЛЯЕМ
+                history: db.slice(0, 300)
+            })
+        });
+
+        if (!response.ok) {
+            throw new Error('HTTP ' + response.status);
+        }
+
+        const raw = await response.json();
+        const content = raw?.choices?.[0]?.message?.content || '';
+
+        if (!content) {
+            document.getElementById(tempId).innerText =
+                '⚠️ AI не вернул ответ. Попробуй переформулировать запрос.';
+            return;
+        }
+
+        // ===== КЛЮЧЕВОЙ ФИКС =====
+        // Ищем JSON внутри любого текста
+        const jsonMatch = content.match(/\{[\s\S]*?\}/);
+
+        let ai = null;
+        if (jsonMatch) {
+            try {
+                ai = JSON.parse(jsonMatch[0]);
+            } catch (e) {
+                console.warn('Ошибка парсинга JSON от AI', e);
+            }
+        }
+
+        /* ===== НОРМАЛИЗАЦИЯ КАТЕГОРИЙ ===== */
+        const catAliases = {
+    // ===== РАСХОДЫ =====
+    авто: ["авто","машина","бензин","заправ","топливо","азс","мойка"],
+    продукты: ["продукты","еда","магазин","супермаркет","хлеб"],
+    жильё: ["жиль","квартир","коммун","интернет","свет","вода"],
+    шопинг: ["шопинг","одежд","техника","покупк"],
+    аптека: ["аптек","лекарств","таблет"],
+    отдых: ["отдых","кафе","ресторан","кино"],
+
+    // ===== ДОХОДЫ =====
+    зарплата: ["зарплат","зп","оклад"],
+    инвест: ["дивиденд","акци","инвест","процент","доход"],
+    подарок: ["подар","перевод","дали","получил"]
+};
+
+       function resolveCategory(cat = "") {
+    if (!cat) return "прочее";
+
+    cat = cat.toLowerCase().trim();
+
+    // ✅ 1. ЕСЛИ AI УЖЕ ВЕРНУЛ НОРМАЛЬНУЮ КАТЕГОРИЮ — БЕРЁМ ЕЁ
+    if (iconMap[cat]) {
+        return cat;
+    }
+
+    // ✅ 2. ИНАЧЕ ПЫТАЕМСЯ ОПРЕДЕЛИТЬ ПО СЛОВАМ
+    for (const [key, arr] of Object.entries(catAliases)) {
+        if (arr.some(w => cat.includes(w))) {
+            return key;
+        }
+    }
+
+    // ✅ 3. ФОЛБЭК
+    return "прочее";
+}
+
+
+                 const iconMap = {
+                      // Расходы
+                    продукты: "🛒",
+                    авто: "🚗",
+                    жильё: "🏠",
+                    шопинг: "🛍️",
+                    аптека: "💊",
+                    отдых: "🎭",
+
+                      // Доходы
+                   зарплата: "💵",
+                   инвест: "📈",
+                   подарок: "🎁",
+                   прочее: "📦"
+};
+
+
+        /* ===== ДОБАВЛЕНИЕ ТРАНЗАКЦИИ ===== */
+        if (ai && ai.action === 'add') {
+            const catKey = resolveCategory(ai.category || ai.note || '');
+            const amount = Number(ai.amount);
+
+            if (!amount || amount <= 0) {
+                document.getElementById(tempId).innerText =
+                    '⚠️ Не смог корректно определить сумму.';
+                return;
+            }
+
+            const entry = {
+                id: Date.now(),
+                t: ai.type === 'inc' ? 'inc' : 'exp',
+                c: iconMap[catKey],
+                s: amount,
+                n: ai.note || '',
+                d: new Date().toISOString().split('T')[0]
+            };
+
+            db.unshift(entry);
+            updateUI();
+            await cloudSave();
+
+            document.getElementById(tempId).innerHTML = `
+                ✅ <b>Записано</b><br>
+                ${entry.c} ${entry.s.toLocaleString()} ₽ — ${entry.n}
+            `;
+            return;
+        }
+
+        /* ===== АНАЛИЗ / ЧАТ ===== */
+        if (ai && ai.action === 'chat') {
+            document.getElementById(tempId).innerText = ai.text;
+        } else {
+            // fallback — обычный текст
+            document.getElementById(tempId).innerText = content;
+        }
+
+    } catch (e) {
+        console.error(e);
+        document.getElementById(tempId).innerText =
+            '❌ Ошибка связи с AI. Попробуй позже.';
+    }
+
+    chat.scrollTop = chat.scrollHeight;
+}
+
+      
+        
+        window.quickAdd = async (t, c, s, n) => { db.unshift({ id: Date.now(), t, c, s, n, d: new Date().toISOString().split('T')[0] }); updateUI(); await cloudSave(); go('home'); };
+
+     // --- ЛОГИКА ПОДПИСКИ ---
+
+    // Функция проверки подписки
+   async function checkSubscription() {
+    try {
+        const tgUser = window.tg?.initDataUnsafe?.user;
+        // УБЕДИСЬ, ЧТО ЭТОТ ID СОВПАДАЕТ С ID В ТАБЛИЦЕ SUPABASE
+        const currentIdStr = tgUser?.id?.toString() || "6793993761"; 
+        const numericId = parseInt(currentIdStr);
+
+        // Проверка админа (если это твой ID — окно не вылезет)
+        if (currentIdStr === "679399376") return; 
+
+        let { data, error } = await _supabase
+            .from('subscriptions')
+            .select('*')
+            .eq('user_id', numericId)
+            .single();
+
+        const now = new Date();
+
+        if (!data) {
+            // Если в базе пусто, создаем триал и выходим
+            const trialEnd = new Date();
+            trialEnd.setDate(trialEnd.getDate() + 7);
+            await _supabase.from('subscriptions').insert({ 
+                user_id: numericId, 
+                expires_at: trialEnd.toISOString() 
+            });
+            return;
+        }
+
+        const expireDate = new Date(data.expires_at);
+        
+        // СРАВНЕНИЕ ДАТ
+        if (now > expireDate) {
+            console.log("СРОК ИСТЕК");
+            // Используем таймаут, чтобы окно появилось ПОСЛЕ загрузки всех страниц
+            setTimeout(() => {
+                const payModal = document.getElementById('paywall-modal');
+                if (payModal) {
+                    payModal.style.setProperty('display', 'flex', 'important');
+                    payModal.style.zIndex = "999999"; // Максимальный приоритет
+                }
+            }, 1000); 
+        }
+    } catch (e) {
+        console.error("Ошибка:", e);
+    }
+}
+
+    // Функция оплаты
+    async function buySubscription() {
+        const status = document.getElementById('pay-status');
+        if (status) status.innerText = "Открываем бота...";
+
+        const botUrl = "https://t.me/Finans_Neyro_bot?start=pay";
+
+        if (window.tg) {
+            // Пробуем открыть инвойс
+            window.tg.openTelegramLink(botUrl);
+            // Закрываем приложение через секунду
+            setTimeout(() => window.tg.close(), 1000);
+        } else {
+            window.open(botUrl, '_blank');
+        }
+    }
+
+    // --- ЕДИНЫЙ ЗАПУСК ПРИЛОЖЕНИЯ ---
+    window.onload = async () => {
+        console.log("App Started");
+
+        // 1. Настройка дат
+        const today = new Date().toISOString().split('T')[0];
+        const datePicker = document.getElementById('date-picker');
+        if(datePicker) datePicker.value = today;
+        const taskDate = document.getElementById('task-date');
+        if(taskDate) taskDate.value = today;
+
+        // 2. Инициализация Telegram
+        if (window.tg) {
+            tg.expand();
+            tg.ready();
+        }
+
+        // 3. Мгновенный запуск интерфейса (чтобы не было черного экрана)
+        if(typeof renderGoals === 'function') renderGoals();
+        if(typeof setMode === 'function') setMode('exp');
+        
+        // ВАЖНО: Открываем домашнюю страницу
+        if(typeof go === 'function') {
+            go('home'); 
+        } else {
+            // Если функция go еще не прогрузилась (резерв)
+            document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+            document.getElementById('home').classList.add('active');
+        }
+
+        // 4. Фоновые задачи (база данных)
+        try {
+            if(typeof getRates === 'function') getRates();
+            if(typeof loadNotebook === 'function') loadNotebook();
+            
+            // Проверяем подписку и грузим облако
+            await checkSubscription();
+            if(typeof syncFromCloud === 'function') syncFromCloud();
+            if(typeof syncNotebookFromCloud === 'function') syncNotebookFromCloud();
+            
+        } catch (e) {
+            console.error("Фоновая ошибка:", e);
+        }
+    };
+
+function setMode(m) { mode = m; currentCat = cats[m][0].i; renderCats(); document.getElementById('btn-exp').style.background = m === 'exp' ? 'var(--blue)' : 'transparent'; document.getElementById('btn-inc').style.background = m === 'inc' ? 'var(--blue)' : 'transparent'; }
+        function toggleBlur() { document.getElementById('bal').classList.toggle('blurred'); tg.HapticFeedback.impactOccurred('light'); }
+        function openEdit(id) { editingId = id; const item = db.find(x => x.id === id); document.getElementById('edit-sum').value = item.s; document.getElementById('edit-note').value = item.n; document.getElementById('edit-modal').style.display = 'flex'; }
+        function closeModal() { document.getElementById('edit-modal').style.display = 'none'; }
+        async function confirmEdit() { const item = db.find(x => x.id === editingId); item.s = parseFloat(document.getElementById('edit-sum').value); item.n = document.getElementById('edit-note').value; updateUI(); closeModal(); await cloudSave(); }
+        async function deleteTransaction() { db = db.filter(x => x.id !== editingId); updateUI(); closeModal(); await cloudSave(); }
 
         async function getRates() {
             try {
@@ -940,40 +1256,136 @@
                 document.getElementById('usd-rate').innerText = rub.rates.RUB.toFixed(2) + '₽';
             } catch(e) {}
         }
-        
-        // Голосовой ввод
-        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-        if (SpeechRecognition) {
-            const rec = new SpeechRecognition(); rec.lang = 'ru-RU';
-            rec.onstart = () => { isListening=true; document.getElementById('mic-btn').classList.add('active'); };
-            rec.onend = () => { isListening=false; document.getElementById('mic-btn').classList.remove('active'); };
-            rec.onresult = (e) => { const t = e.results[0][0].transcript; if(t) { document.getElementById('ai-input').value = t; askAI(); } };
-            window.toggleVoice = () => { if(isListening) rec.stop(); else rec.start(); };
-        } else { window.toggleVoice = () => alert('Нет поддержки голоса'); }
 
-        // --- ГЛАВНЫЙ СТАРТ ---
-        window.onload = async () => {
-            console.log("App Started. User ID:", userId);
-            
-            // Инит Telegram
-            if (window.tg) { tg.expand(); tg.ready(); }
-            
-            // Установка даты
-            const today = new Date().toISOString().split('T')[0];
-            const dp = document.getElementById('date-picker'); if(dp) dp.value = today;
-            const td = document.getElementById('task-date'); if(td) td.value = today;
-
-            // Загрузка всего
-            await checkSubscription();
-            loadNotebook();           // Локальные задачи
-            await syncNotebookFromCloud(); // Облачные задачи
-            await syncFromCloud();    // Финансы из базы
-
-            // Запуск UI
-            getRates();
-            renderGoals();
-            go('home');
+        // ГЛАВНАЯ ФУНКЦИЯ СОХРАНЕНИЯ В ОБЛАКО
+async function syncNotebookToCloud() {
+    try {
+        // Собираем все данные в один объект
+        const dataToSave = { 
+            tasks: typeof tasks !== 'undefined' ? tasks : [], 
+            habits: typeof habits !== 'undefined' ? habits : [], 
+            notes: typeof notes !== 'undefined' ? notes : [], 
+            goals_list: typeof goals_list !== 'undefined' ? goals_list : [] // Сохраняем цели!
         };
+        
+        // Отправляем в Supabase (убедись, что userId определен)
+        const { error } = await _supabase.from('notebook').upsert({ 
+            id: userId, 
+            data: dataToSave, 
+            updated_at: new Date().toISOString() 
+        });
+
+        if (error) throw error;
+        console.log("Данные блокнота сохранены в облако");
+    } catch (e) {
+        console.error("Ошибка сохранения в облако:", e);
+    }
+}
+
+// ФУНКЦИЯ ЗАГРУЗКИ ИЗ ОБЛАКА
+async function syncNotebookFromCloud() {
+    try {
+        const { data, error } = await _supabase.from('notebook').select('data').eq('id', userId).single();
+        
+        if (error && error.code !== 'PGRST116') throw error; // Игнорируем ошибку, если записи еще нет
+
+        if (data && data.data) {
+            tasks = data.data.tasks || [];
+            habits = data.data.habits || [];
+            notes = data.data.notes || [];
+            goals_list = data.data.goals_list || []; // Загружаем цели!
+            
+            // Сохраняем в локальную память и обновляем экран
+            saveNotebook(); 
+            if (typeof renderTasks === 'function') renderTasks();
+            if (typeof renderHabits === 'function') renderHabits();
+            if (typeof renderNotes === 'function') renderNotes();
+            if (typeof renderGoals === 'function') renderGoals();
+            console.log("Данные из облака загружены");
+        }
+    } catch (e) {
+        console.error("Ошибка загрузки из облака:", e);
+    }
+}
+
+       window.onload = async () => { 
+    // Установка дат
+    document.getElementById('date-picker').value = new Date().toISOString().split('T')[0];
+    document.getElementById('task-date').value = new Date().toISOString().split('T')[0];
+    
+    // Инициализация Telegram
+    if (window.tg) {
+        tg.expand();
+        tg.ready();
+    }
+
+    // 1. ПРОВЕРКА ПОДПИСКИ (важно сделать до отрисовки интерфейса)
+    await checkSubscription();
+
+    // 2. ЗАГРУЗКА ДАННЫХ
+    await syncFromCloud(); 
+    loadNotebook(); 
+    await syncNotebookFromCloud(); 
+
+    // 3. ОТРИСОВКА ИНТЕРФЕЙСА
+    getRates();
+    setMode('exp'); // Отрисовываем категории на главной
+    renderGoals(); 
+    go('home'); // Открываем главную страницу
+};
+
+// Открыть модальное окно управления целью
+function openGoalAction(id) {
+    selectedGoalId = id.toString();
+    const goal = goals_list.find(g => g.id === selectedGoalId);
+    if (goal) {
+        document.getElementById('modal-goal-title').innerText = goal.title;
+        document.getElementById('goal-action-modal').style.display = 'flex';
+        if(window.tg) tg.HapticFeedback.impactOccurred('medium');
+    }
+}
+
+// Закрыть окно
+function closeGoalActionModal() {
+    document.getElementById('goal-action-modal').style.display = 'none';
+    document.getElementById('add-goal-money').value = '';
+}
+
+// Внести деньги
+async function addMoneyToGoal() {
+    const input = document.getElementById('add-goal-money');
+    const val = parseFloat(input.value);
+    if (!val || val <= 0) return;
+
+    const goal = goals_list.find(g => g.id === selectedGoalId);
+    if (goal) {
+        goal.current += val;
+        closeGoalActionModal();
+        renderGoals();
+        if (typeof syncNotebookToCloud === 'function') await syncNotebookToCloud();
+        if(window.tg) tg.HapticFeedback.notificationOccurred('success');
+    }
+}
+
+// Удалить цель
+async function deleteGoalReal() {
+    if (!confirm("Удалить эту цель?")) return;
+    goals_list = goals_list.filter(g => g.id !== selectedGoalId);
+    closeGoalActionModal();
+    renderGoals();
+    if (typeof syncNotebookToCloud === 'function') await syncNotebookToCloud();
+}
+
+// Редактировать название
+async function editGoalName() {
+    const goal = goals_list.find(g => g.id === selectedGoalId);
+    const newName = prompt("Новое название цели:", goal.title);
+    if (newName) {
+        goal.title = newName;
+        renderGoals();
+        if (typeof syncNotebookToCloud === 'function') await syncNotebookToCloud();
+    }
+}
     </script>
 </body>
 </html>
