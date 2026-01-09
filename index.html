@@ -985,13 +985,13 @@ async function askAI() {
     chat.scrollTop = chat.scrollHeight;
 
     try {
-        const response = await fetch('/chat', {
+        const response = await fetch('https://finance-tg-app.onrender.com/chat', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 prompt: q,
-                user_id: userId, // <--- ВАЖНО: Теперь мы передаем ID пользователя!
-                history: db.slice(0, 300) 
+                user_id: userId, // <--- ВОТ СЮДА ДОБАВЛЯЕМ
+                history: db.slice(0, 300)
             })
         });
 
@@ -1389,6 +1389,7 @@ async function editGoalName() {
     </script>
 </body>
 </html>
+
 
 
 
