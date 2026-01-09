@@ -984,140 +984,104 @@ async function askAI() {
     chat.innerHTML += `<div id="${tempId}" class="ai-msg">🤖 Думаю и анализирую…</div>`;
     chat.scrollTop = chat.scrollHeight;
 
+    // --- НАСТРОЙКИ КАТЕГОРИЙ (ВАШИ АЛИАСЫ) ---
+    const iconMap = {
+        продукты: "🛒", авто: "🚗", жильё: "🏠", шопинг: "🛍️",
+        аптека: "💊", отдых: "🎭", зарплата: "💵", инвест: "📈",
+        подарок: "🎁", прочее: "📦"
+    };
+
+    const catAliases = {
+        авто: ["авто","машина","бензин","заправ","топливо","мойка"],
+        продукты: ["продукты","еда","магазин","супермаркет","хлеб"],
+        жильё: ["жиль","квартир","коммун","интернет","свет","вода"],
+        шопинг: ["шопинг","одежд","техника","покупк"],
+        аптека: ["аптек","лекарств","таблет"],
+        отдых: ["отдых","кафе","ресторан","кино"],
+        зарплата: ["зарплат","зп","оклад"],
+        инвест: ["дивиденд","акци","инвест"],
+        подарок: ["подар","перевод","дали"]
+    };
+
+    function resolveCategory(cat = "") {
+        if (!cat) return "прочее";
+        cat = cat.toLowerCase().trim();
+        if (iconMap[cat]) return cat;
+        for (const [key, arr] of Object.entries(catAliases)) {
+            if (arr.some(w => cat.includes(w))) return key;
+        }
+        return "прочее";
+    }
+
     try {
-        const response = await fetch('/chat', {
+        const response = await fetch('https://finance-tg-app.onrender.com/chat', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 prompt: q,
-                history: db.slice(0, 300) // ⬅️ ВСЕГДА массив
+                user_id: userId // Передаем ID, историю сервер подтянет сам из finance
             })
         });
 
-        if (!response.ok) {
-            throw new Error('HTTP ' + response.status);
-        }
+        if (!response.ok) throw new Error('HTTP ' + response.status);
 
         const raw = await response.json();
         const content = raw?.choices?.[0]?.message?.content || '';
 
         if (!content) {
-            document.getElementById(tempId).innerText =
-                '⚠️ AI не вернул ответ. Попробуй переформулировать запрос.';
+            document.getElementById(tempId).innerText = '⚠️ AI не вернул ответ.';
             return;
         }
 
-        // ===== КЛЮЧЕВОЙ ФИКС =====
-        // Ищем JSON внутри любого текста
-        const jsonMatch = content.match(/\{[\s\S]*?\}/);
-
-        let ai = null;
+        // ПРОВЕРКА НА JSON ВНУТРИ ОТВЕТА
+        const jsonMatch = content.match(/\[JSON_DATA\]([\s\S]*?)\[\/JSON_DATA\]/);
+        
         if (jsonMatch) {
             try {
-                ai = JSON.parse(jsonMatch[0]);
+                const aiData = JSON.parse(jsonMatch[1]);
+                const catKey = resolveCategory(aiData.category);
+                const amount = Number(aiData.amount);
+
+                if (amount && amount > 0) {
+                    // Создаем запись для мгновенного отображения в UI
+                    const entry = {
+                        id: Date.now(),
+                        type: aiData.type === 'income' ? 'income' : 'expense',
+                        category: catKey,
+                        amount: amount,
+                        description: aiData.description || '',
+                        created_at: new Date().toISOString()
+                    };
+
+                    // Добавляем в локальную базу (db) и обновляем экран
+                    if (typeof db !== 'undefined') {
+                        db.unshift(entry);
+                        if (typeof renderFinance === 'function') renderFinance();
+                    }
+
+                    // Чистим текст от JSON-тегов и выводим красивое подтверждение
+                    const cleanMsg = content.replace(/\[JSON_DATA\].*?\[\/JSON_DATA\]/gs, "").trim();
+                    document.getElementById(tempId).innerHTML = `
+                        ${cleanMsg}<br><br>
+                        ✅ <b>Записано в базу:</b><br>
+                        ${iconMap[catKey]} ${amount.toLocaleString()} ₽ — ${entry.description}
+                    `;
+                    
+                    // Синхронизируем, чтобы данные не пропали
+                    setTimeout(() => { if(typeof syncFromCloud === 'function') syncFromCloud(); }, 1000);
+                    return;
+                }
             } catch (e) {
-                console.warn('Ошибка парсинга JSON от AI', e);
+                console.error("Ошибка обработки записи:", e);
             }
         }
 
-        /* ===== НОРМАЛИЗАЦИЯ КАТЕГОРИЙ ===== */
-        const catAliases = {
-    // ===== РАСХОДЫ =====
-    авто: ["авто","машина","бензин","заправ","топливо","азс","мойка"],
-    продукты: ["продукты","еда","магазин","супермаркет","хлеб"],
-    жильё: ["жиль","квартир","коммун","интернет","свет","вода"],
-    шопинг: ["шопинг","одежд","техника","покупк"],
-    аптека: ["аптек","лекарств","таблет"],
-    отдых: ["отдых","кафе","ресторан","кино"],
-
-    // ===== ДОХОДЫ =====
-    зарплата: ["зарплат","зп","оклад"],
-    инвест: ["дивиденд","акци","инвест","процент","доход"],
-    подарок: ["подар","перевод","дали","получил"]
-};
-
-       function resolveCategory(cat = "") {
-    if (!cat) return "прочее";
-
-    cat = cat.toLowerCase().trim();
-
-    // ✅ 1. ЕСЛИ AI УЖЕ ВЕРНУЛ НОРМАЛЬНУЮ КАТЕГОРИЮ — БЕРЁМ ЕЁ
-    if (iconMap[cat]) {
-        return cat;
-    }
-
-    // ✅ 2. ИНАЧЕ ПЫТАЕМСЯ ОПРЕДЕЛИТЬ ПО СЛОВАМ
-    for (const [key, arr] of Object.entries(catAliases)) {
-        if (arr.some(w => cat.includes(w))) {
-            return key;
-        }
-    }
-
-    // ✅ 3. ФОЛБЭК
-    return "прочее";
-}
-
-
-                 const iconMap = {
-                      // Расходы
-                    продукты: "🛒",
-                    авто: "🚗",
-                    жильё: "🏠",
-                    шопинг: "🛍️",
-                    аптека: "💊",
-                    отдых: "🎭",
-
-                      // Доходы
-                   зарплата: "💵",
-                   инвест: "📈",
-                   подарок: "🎁",
-                   прочее: "📦"
-};
-
-
-        /* ===== ДОБАВЛЕНИЕ ТРАНЗАКЦИИ ===== */
-        if (ai && ai.action === 'add') {
-            const catKey = resolveCategory(ai.category || ai.note || '');
-            const amount = Number(ai.amount);
-
-            if (!amount || amount <= 0) {
-                document.getElementById(tempId).innerText =
-                    '⚠️ Не смог корректно определить сумму.';
-                return;
-            }
-
-            const entry = {
-                id: Date.now(),
-                t: ai.type === 'inc' ? 'inc' : 'exp',
-                c: iconMap[catKey],
-                s: amount,
-                n: ai.note || '',
-                d: new Date().toISOString().split('T')[0]
-            };
-
-            db.unshift(entry);
-            updateUI();
-            await cloudSave();
-
-            document.getElementById(tempId).innerHTML = `
-                ✅ <b>Записано</b><br>
-                ${entry.c} ${entry.s.toLocaleString()} ₽ — ${entry.n}
-            `;
-            return;
-        }
-
-        /* ===== АНАЛИЗ / ЧАТ ===== */
-        if (ai && ai.action === 'chat') {
-            document.getElementById(tempId).innerText = ai.text;
-        } else {
-            // fallback — обычный текст
-            document.getElementById(tempId).innerText = content;
-        }
+        // ЕСЛИ ЭТО ПРОСТО ЧАТ (БЕЗ ЗАПИСИ)
+        document.getElementById(tempId).innerText = content;
 
     } catch (e) {
         console.error(e);
-        document.getElementById(tempId).innerText =
-            '❌ Ошибка связи с AI. Попробуй позже.';
+        document.getElementById(tempId).innerText = '❌ Ошибка связи с ИИ.';
     }
 
     chat.scrollTop = chat.scrollHeight;
@@ -1388,6 +1352,7 @@ async function editGoalName() {
     </script>
 </body>
 </html>
+
 
 
 
