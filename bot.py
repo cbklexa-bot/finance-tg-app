@@ -16,10 +16,10 @@ supabase: Client = create_client(URL, KEY)
 app = Flask(__name__)
 CORS(app)
 
-# Хелсчек для Render
+# Хелсчек для Render, чтобы он видел, что сервер жив
 @app.route('/')
 def health():
-    return "Бот и Сервер запущены", 200
+    return "Бот и Сервер запущены и работают", 200
 
 @app.route('/chat', methods=['POST'])
 def chat_ai():
@@ -72,6 +72,7 @@ def chat_ai():
 # --- ТЕЛЕГРАМ БОТ ---
 @bot.message_handler(commands=['start'])
 def start(message):
+    print(f"Получена команда /start от {message.chat.id}") # Для отладки в логах
     if "pay" in message.text:
         bot.send_invoice(
             message.chat.id, "НейроСчет: Подписка", "Доступ на 30 дней", "month_sub",
@@ -96,15 +97,25 @@ def success(message):
 # --- ПРАВИЛЬНЫЙ ЗАПУСК ---
 
 def run_bot():
-    print("Запуск бота...")
-    bot.infinity_polling(timeout=20, long_polling_timeout=10)
+    """Функция для запуска бота"""
+    print("Запуск бота через infinity_polling...")
+    try:
+        bot.infinity_polling(timeout=20, long_polling_timeout=10)
+    except Exception as e:
+        print(f"Критическая ошибка бота: {e}")
+        time.sleep(5)
 
 if __name__ == "__main__":
-    # 1. Запускаем бота в отдельном потоке
+    # СБРОС ВЕБХУКА: Если команды не работали, эта строка их оживит
+    bot.remove_webhook()
+    time.sleep(1) # Даем Telegram время на сброс
+    
+    # 1. Запускаем бота в ФОНОВОМ потоке
     bot_thread = threading.Thread(target=run_bot, daemon=True)
     bot_thread.start()
 
-    # 2. Запускаем Flask в основном потоке (обязательно для Render)
+    # 2. Запускаем Flask в ОСНОВНОМ потоке
     port = int(os.environ.get("PORT", 10000))
     print(f"Flask сервер запущен на порту {port}")
-    app.run(host="0.0.0.0", port=port)
+    # debug=False предотвращает двойной запуск бота
+    app.run(host="0.0.0.0", port=port, debug=False, use_reloader=False)
