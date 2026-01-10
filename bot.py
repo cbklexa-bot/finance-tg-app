@@ -1,97 +1,68 @@
-import os, time, threading, telebot, requests, json, re
-from flask import Flask, request, jsonify, send_from_directory
-from flask_cors import CORS
+import os
+import telebot
+import threading
+import http.server
+import socketserver
 from supabase import create_client, Client
-from datetime import datetime
+from datetime import datetime, timedelta
 
-# Настройки (убедись, что переменные в Render прописаны)
+# --- БЛОК ДЛЯ СТАБИЛЬНОЙ РАБОТЫ НА RENDER (Health Check) ---
+def run_health_server():
+    handler = http.server.SimpleHTTPRequestHandler
+    port = int(os.environ.get("PORT", 10000))
+    with socketserver.TCPServer(("", port), handler) as httpd:
+        print(f"Health check server running on port {port}")
+        httpd.serve_forever()
+
+threading.Thread(target=run_health_server, daemon=True).start()
+# -----------------------------------------------------------
+
+# Загрузка ключей из переменных окружения Render
 TOKEN = os.environ.get('BOT_TOKEN')
 URL = os.environ.get('SUPABASE_URL')
 KEY = os.environ.get('SUPABASE_KEY')
-OR_KEY = os.environ.get('OPENROUTER_API_KEY')
 
 bot = telebot.TeleBot(TOKEN)
 supabase: Client = create_client(URL, KEY)
-app = Flask(__name__, static_folder='.')
-CORS(app)
 
-@app.route('/')
-def index():
-    return send_from_directory('.', 'index.html')
-
-@app.route('/chat', methods=['POST'])
-def chat_ai():
-    try:
-        data = request.json
-        prompt = data.get('prompt', '')
-        user_id = str(data.get('user_id', ''))
-
-        # 1. ПОЛУЧАЕМ ЧИСТУЮ ИСТОРИЮ ИЗ БАЗЫ
-        history_text = "История пуста."
-        res = supabase.table("finance").select("data").eq("user_id", user_id).order("created_at", desc=True).limit(40).execute()
-        
-        if res.data:
-            items = []
-            for row in res.data:
-                d = row['data']
-                # Формат для ИИ: Дата | Тип | Сумма | Категория | Описание
-                type_name = "Доход" if d.get('t') == 'inc' else "Расход"
-                items.append(f"{d.get('d')}: {type_name} {d.get('s')} руб. [{d.get('c')}] {d.get('n')}")
-            history_text = "\n".join(items)
-
-        # 2. ЖЕСТКАЯ СИСТЕМНАЯ ИНСТРУКЦИЯ
-        system_msg = f"""Ты — эксперт по личным финансам. Сегодня {datetime.now().strftime('%Y-%m-%d')}.
-У тебя есть доступ к истории операций пользователя ниже. Твоя цель: помогать записывать траты и анализировать их.
-
-ИСТОРИЯ ОПЕРАЦИЙ:
-{history_text}
-
-ПРАВИЛА ОТВЕТА:
-1. Если пользователь хочет ЗАПИСАТЬ операцию, верни текст подтверждения и строго в конце добавь блок:
-[JSON]{{"s": сумма_числом, "c": "иконка_категории", "t": "exp_или_inc", "n": "описание"}}[/JSON]
-Иконки: 🛒(продукты), 🚗(авто), 🏠(жилье), 🛍️(шопинг), 💊(аптека), 🎭(отдых), 💵(доход), 📦(прочее).
-
-2. Если пользователь спрашивает АНАЛИЗ (например, "сколько я потратил на еду?"), ТЫ ДОЛЖЕН САМ СЛОЖИТЬ ЦИФРЫ ИЗ ИСТОРИИ ВЫШЕ И ДАТЬ ТОЧНЫЙ ОТВЕТ. Не придумывай цифры!
-3. Отвечай всегда по-русски, кратко и дружелюбно."""
-
-        # 3. ЗАПРОС К DEEPSEEK (через OpenRouter)
-        resp = requests.post(
-            "https://openrouter.ai/api/v1/chat/completions",
-            headers={"Authorization": f"Bearer {OR_KEY}", "Content-Type": "application/json"},
-            json={
-                "model": "deepseek/deepseek-chat",
-                "messages": [
-                    {"role": "system", "content": system_msg},
-                    {"role": "user", "content": prompt}
-                ],
-                "temperature": 0.1 # Минимум фантазии, максимум точности
-            }
+@bot.message_handler(commands=['start'])
+def start(message):
+    # Проверяем, пришел ли пользователь из приложения по ссылке ?start=pay
+    if "pay" in message.text:
+        bot.send_invoice(
+            message.chat.id,
+            title="НейроСчет: Подписка",
+            description="Доступ к функциям НейроСчет на 30 дней",
+            invoice_payload="month_sub",
+            provider_token="", # Для Telegram Stars всегда пусто
+            currency="XTR",    # Валюта: Telegram Stars
+            prices=[telebot.types.LabeledPrice(label="Активировать НейроСчет", amount=100)], # 100 звезд ≈ 199 руб
+            start_parameter="pay"
         )
-        ai_raw_content = resp.json()['choices'][0]['message']['content']
+    else:
+        bot.send_message(message.chat.id, "Добро пожаловать в НейроСчет! Используйте Mini App для управления финансами.")
 
-        # 4. ЛОГИКА ЗАПИСИ В SUPABASE
-        if "[JSON]" in ai_raw_content:
-            json_match = re.search(r"\[JSON\](.*?)\[/JSON\]", ai_raw_content)
-            if json_match:
-                tx_data = json.loads(json_match.group(1))
-                # Дополняем техническими полями
-                tx_data['d'] = datetime.now().strftime("%Y-%m-%d")
-                tx_data['id'] = int(time.time() * 1000)
+@bot.pre_checkout_query_handler(func=lambda query: True)
+def checkout(query):
+    bot.answer_pre_checkout_query(query.id, ok=True)
 
-                # Записываем в базу
-                supabase.table("finance").insert({"user_id": user_id, "data": tx_data}).execute()
-                
-                # Удаляем тех. инфо из сообщения для юзера
-                ai_raw_content = ai_raw_content.replace(json_match.group(0), "").strip()
-
-        return jsonify({"content": ai_raw_content})
-
+@bot.message_handler(content_types=['successful_payment'])
+def success(message):
+    user_id = message.from_user.id
+    # Рассчитываем новую дату (текущая дата + 30 дней)
+    new_date = (datetime.now() + timedelta(days=30)).isoformat()
+    
+    try:
+        # Автоматическое обновление подписки в Supabase
+        supabase.table("subscriptions").upsert({
+            "user_id": user_id, 
+            "expires_at": new_date
+        }).execute()
+        
+        bot.send_message(message.chat.id, "✅ Оплата прошла успешно! Ваш доступ к НейроСчет продлен на 30 дней. Перезапустите приложение.")
     except Exception as e:
-        print(f"ERROR: {e}")
-        return jsonify({"content": "Произошла ошибка в обработке запроса."}), 500
+        print(f"Ошибка Supabase: {e}")
+        bot.send_message(message.chat.id, "⚠️ Оплата прошла, но возникла ошибка при обновлении базы. Пожалуйста, напишите в поддержку.")
 
-# Запуск
-if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 10000))
-    threading.Thread(target=lambda: bot.polling(none_stop=True), daemon=True).start()
-    app.run(host="0.0.0.0", port=port)
+print("Бот НейроСчет запущен и готов к работе...")
+bot.polling(none_stop=True)
