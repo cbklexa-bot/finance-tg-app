@@ -406,6 +406,37 @@
        let userId = tg.initDataUnsafe?.user?.id?.toString() || 'user_demo';
         let db = [];
         let budgets = JSON.parse(localStorage.getItem('fin_budgets_' + userId)) || [];
+        function calculateStats(period = 'month') {
+    const now = new Date();
+    const start =
+        period === 'month'
+            ? new Date(now.getFullYear(), now.getMonth(), 1)
+            : new Date(0);
+
+    const stats = {
+        totalExp: 0,
+        totalInc: 0,
+        byCategory: {}
+    };
+
+    db.forEach(tx => {
+        const d = new Date(tx.d);
+        if (d < start) return;
+
+        if (tx.t === 'exp') {
+            stats.totalExp += tx.s;
+            stats.byCategory[tx.c] =
+                (stats.byCategory[tx.c] || 0) + tx.s;
+        }
+
+        if (tx.t === 'inc') {
+            stats.totalInc += tx.s;
+        }
+    });
+
+    return stats;
+}
+
 
         // === ПЕРЕМЕННЫЕ БЛОКНОТА (ОБНОВЛЕНО) ===
         let tasks = [];
@@ -1331,6 +1362,7 @@ async function editGoalName() {
     </script>
 </body>
 </html>
+
 
 
 
