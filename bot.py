@@ -1,145 +1,77 @@
-import os
-import time
-import threading
-import telebot
-import requests
-import json
-import re
-from flask import Flask, request, jsonify, send_from_directory
-from flask_cors import CORS
-from supabase import create_client, Client
-from datetime import datetime
-from telebot.apihelper import ApiTelegramException
-
-# --- НАСТРОЙКИ ---
-TOKEN = os.environ.get('BOT_TOKEN')
-URL = os.environ.get('SUPABASE_URL')
-KEY = os.environ.get('SUPABASE_KEY')
-OR_KEY = os.environ.get('OPENROUTER_API_KEY')
-
-bot = telebot.TeleBot(TOKEN)
-supabase: Client = create_client(URL, KEY)
-
-app = Flask(__name__, static_folder='.')
-CORS(app)
-
-@app.route('/')
-def index():
-    return send_from_directory('.', 'index.html')
-
 @app.route('/chat', methods=['POST'])
 def chat_ai():
     try:
         data = request.json
-        prompt = data.get('prompt') or data.get('message') or ""
+        prompt = data.get('prompt') or ""
         user_id = data.get('user_id')
 
-        # 1. СБОР ДАННЫХ (ЧИТАЕМ ИЗ КОЛОНКИ data)
-        now = datetime.now()
-        current_date_str = now.strftime("%Y-%m-%d")
-        
+        # 1. СБОР ИСТОРИИ (Читаем из колонки data)
         history_text = "История операций пуста."
-        
         if user_id:
             try:
-                # Выбираем колонку data, где лежат ваши JSON-объекты
-                res = supabase.table("finance").select("data").eq("user_id", str(user_id)).order("created_at", desc=True).limit(40).execute()
-                
+                # Берем последние 50 записей
+                res = supabase.table("finance").select("data").eq("user_id", str(user_id)).order("created_at", desc=True).limit(50).execute()
                 if res.data:
                     lines = []
                     for item in res.data:
                         d = item.get('data', {})
-                        # Извлекаем данные из вложенного объекта (s - сумма, n - описание, t - тип, c - иконка)
-                        type_str = "Доход" if d.get('t') == 'inc' else "Расход"
-                        lines.append(f"- {d.get('d')}: {type_str} | {d.get('c')} | {d.get('s')} руб. ({d.get('n')})")
+                        if isinstance(d, str): d = json.loads(d) # на случай если в базе строка
+                        
+                        t_type = "Расход" if d.get('t') == 'exp' else "Доход"
+                        # Передаем ИИ в максимально понятном виде
+                        lines.append(f"- {d.get('d')}: {t_type} {d.get('c')} {d.get('s')}р. ({d.get('n')})")
                     history_text = "\n".join(lines)
-            except Exception as e: 
+            except Exception as e:
                 print(f"DB Read Error: {e}")
 
-        # 2. УМНАЯ ИНСТРУКЦИЯ (Подстроена под ваш формат {c, d, n, s, t, id})
+        # 2. ИНСТРУКЦИЯ (Учим ИИ работать с вашей структурой)
         system_instruction = f"""
-        Ты — Личный Финансовый Эксперт. Твоя задача: анализировать траты и записывать новые.
-        Сегодня: {current_date_str}.
+        Ты финансовый ассистент. Сегодня: {datetime.now().strftime("%Y-%m-%d")}.
+        Твой формат записи: [JSON_DATA]{{"s": сумма, "c": "иконка", "t": "exp|inc", "n": "название"}}[/JSON_DATA]
 
-        ТВОИ КАТЕГОРИИ (используй эти иконки):
-        🛒 Продукты, 🚗 Авто, 🏠 Жильё, 🛍️ Шопинг, 💊 Аптека, 🎭 Отдых, 🎁 Подарки, 💵 Зарплата, 📈 Инвест, 📦 Прочее.
-
-        ИСТОРИЯ ОПЕРАЦИЙ ПОЛЬЗОВАТЕЛЯ:
+        ИСТОРИЯ ОПЕРАЦИЙ:
         {history_text}
 
         ПРАВИЛА:
-        1. Если пользователь говорит записать расход/доход, ответь коротко и добавь JSON:
-        [JSON_DATA]{{"s": число, "c": "иконка", "t": "exp|inc", "n": "описание"}}[/JSON_DATA]
+        1. Если просят записать — ответь коротко и дай JSON.
+        2. Если просят анализ (например, "сколько потратил на молоко") — считай только по истории выше.
+        3. Используй категории: 🛒 Продукты, 🚗 Авто, 🏠 Жильё, 🛍️ Шопинг, 💊 Аптека, 🎭 Отдых, 🎁 Подарки, 💵 Зарплата, 📈 Инвест, 📦 Прочее.
         """
 
         # 3. ЗАПРОС К OPENROUTER
-        headers = {
-            "Authorization": f"Bearer {OR_KEY}",
-            "Content-Type": "application/json",
-            "HTTP-Referer": "https://finance-tg-app.onrender.com"
-        }
-        
+        headers = {"Authorization": f"Bearer {OR_KEY}", "Content-Type": "application/json"}
         payload = {
             "model": "deepseek/deepseek-chat",
             "messages": [
                 {"role": "system", "content": system_instruction},
                 {"role": "user", "content": prompt}
             ],
-            "temperature": 0.3
+            "temperature": 0.2
         }
         
         response_raw = requests.post("https://openrouter.ai/api/v1/chat/completions", headers=headers, json=payload, timeout=60)
         ai_message = response_raw.json()['choices'][0]['message']['content']
 
-        # 4. ОБРАБОТКА JSON И СОХРАНЕНИЕ (В КОЛОНКУ data)
+        # 4. СОХРАНЕНИЕ В БАЗУ (Если ИИ решил что-то записать)
         if "[JSON_DATA]" in ai_message:
             match = re.search(r"\[JSON_DATA\]([\s\S]*?)\[/JSON_DATA\]", ai_message)
             if match and user_id:
                 try:
                     tx = json.loads(match.group(1).strip())
-                    
-                    # Формируем структуру в точности как в твоем примере из базы
-                    new_entry = {
-                        "c": tx.get('c', '📦'),
-                        "d": current_date_str,
-                        "n": tx.get('n', ''),
-                        "s": float(tx.get('s', 0)),
-                        "t": tx.get('t', 'exp'),
-                        "id": int(time.time() * 1000)
-                    }
+                    tx['d'] = datetime.now().strftime("%Y-%m-%d") # Ставим дату
+                    tx['id'] = int(time.time() * 1000)            # Генерируем ID
 
-                    # Сохраняем в колонку data
+                    # Пишем в колонку data
                     supabase.table("finance").insert({
                         "user_id": str(user_id),
-                        "data": new_entry
+                        "data": tx
                     }).execute()
                     
-                    # Убираем технический JSON из ответа
-                    ai_message = re.sub(r"\[JSON_DATA\].*?\[/JSON_DATA\]", "", ai_message, flags=re.DOTALL).strip()
+                    # Убираем JSON из ответа пользователю (фронтенд его и так увидит)
+                    ai_message = re.sub(r"\[JSON_DATA\].*?\[\/JSON_DATA\]", "", ai_message, flags=re.DOTALL).strip()
                 except Exception as e:
                     print(f"Insert error: {e}")
 
         return jsonify({"choices": [{"message": {"content": ai_message}}]})
-
     except Exception as e:
-        print(f"Global Error: {e}")
         return jsonify({"error": str(e)}), 500
-
-# --- ТЕЛЕГРАМ БОТ ---
-@bot.message_handler(commands=['start'])
-def start(message):
-    bot.send_message(message.chat.id, "Привет! Я твой финансовый эксперт. Я вижу твою историю и готов помогать.")
-
-def run_bot():
-    bot.remove_webhook()
-    time.sleep(1)
-    while True:
-        try:
-            bot.polling(none_stop=True, interval=0, timeout=20)
-        except Exception as e:
-            time.sleep(5)
-
-if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 10000))
-    threading.Thread(target=lambda: app.run(host="0.0.0.0", port=port), daemon=True).start()
-    run_bot()
