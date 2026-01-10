@@ -1,119 +1,104 @@
 import os
-import time
-import threading
-import telebot
-import requests
 import json
-import re
-from flask import Flask, request, jsonify, send_from_directory
+import requests
+from flask import Flask, request, jsonify
 from flask_cors import CORS
-from supabase import create_client, Client
-from datetime import datetime
 
-# --- НАСТРОЙКИ ---
-TOKEN = os.environ.get('BOT_TOKEN')
-URL = os.environ.get('SUPABASE_URL')
-KEY = os.environ.get('SUPABASE_KEY')
-OR_KEY = os.environ.get('OPENROUTER_API_KEY')
+# --- ENV ---
+OPENROUTER_API_KEY = os.environ.get("OPENROUTER_API_KEY")
 
-# Инициализация
-bot = telebot.TeleBot(TOKEN)
-supabase: Client = create_client(URL, KEY)
-app = Flask(__name__, static_folder='.')
+app = Flask(__name__)
 CORS(app)
 
-@app.route('/')
-def index():
-    return send_from_directory('.', 'index.html')
-
-@app.route('/chat', methods=['POST'])
+@app.route("/chat", methods=["POST"])
 def chat_ai():
     try:
-        data = request.json
-        prompt = data.get('prompt') or ""
-        user_id = data.get('user_id')
+        data = request.json or {}
+        prompt = data.get("prompt", "")
+        history = data.get("history", [])
 
-        # 1. СБОР ИСТОРИИ
-        history_text = "История операций пуста."
-        if user_id:
-            try:
-                res = supabase.table("finance").select("data").eq("user_id", str(user_id)).order("created_at", desc=True).limit(50).execute()
-                if res.data:
-                    lines = []
-                    for item in res.data:
-                        d = item.get('data', {})
-                        if isinstance(d, str): d = json.loads(d)
-                        t_type = "Расход" if d.get('t') == 'exp' else "Доход"
-                        lines.append(f"- {d.get('d')}: {t_type} {d.get('c')} {d.get('s')}р. ({d.get('n')})")
-                    history_text = "\n".join(lines)
-            except Exception as e:
-                print(f"DB Read Error: {e}")
+        system_prompt = """
+Ты — умный личный финансовый ассистент.
 
-        # 2. ИНСТРУКЦИЯ
-        system_instruction = f"""
-        Ты финансовый ассистент. Сегодня: {datetime.now().strftime("%Y-%m-%d")}.
-        Твой формат записи: [JSON_DATA]{{"s": сумма, "c": "иконка", "t": "exp|inc", "n": "название"}}[/JSON_DATA]
+ТЕБЕ ПЕРЕДАЮТ history — МАССИВ транзакций пользователя.
 
-        ИСТОРИЯ ОПЕРАЦИЙ:
-        {history_text}
+ФОРМАТ history:
+- t: "exp" | "inc"
+- c: категория (строка)
+- s: сумма (число)
+- n: описание
+- d: дата YYYY-MM-DD
 
-        ПРАВИЛА:
-        1. Если просят записать — ответь коротко и дай JSON.
-        2. Если просят анализ — считай по истории.
-        3. Категории: 🛒 Продукты, 🚗 Авто, 🏠 Жильё, 🛍️ Шопинг, 💊 Аптека, 🎭 Отдых, 🎁 Подарки, 💵 Зарплата, 📈 Инвест, 📦 Прочее.
-        """
+СТРОГИЕ ПРАВИЛА:
 
-        # 3. ЗАПРОС К OPENROUTER
-        headers = {"Authorization": f"Bearer {OR_KEY}", "Content-Type": "application/json"}
+1. ЕСЛИ пользователь описывает ФАКТ:
+   "купил", "заправил", "получил", "зарплата", "дивиденды"
+
+➡️ ВЕРНИ ТОЛЬКО JSON:
+{
+  "action": "add",
+  "type": "exp | inc",
+  "category": "строка",
+  "amount": число,
+  "note": "кратко"
+}
+
+❌ НИКАКОГО текста вместе с JSON
+
+2. ЕСЛИ пользователь просит:
+   анализ, итоги, советы, период, статистику
+
+➡️ ВЕРНИ:
+{
+  "action": "chat",
+  "text": "подробный анализ на основе history"
+}
+
+❌ ЗАПРЕЩЕНО добавлять транзакции при анализе
+❌ ЗАПРЕЩЕНО возвращать JSON при анализе
+
+3. Ты ОБЯЗАН:
+- использовать ВСЮ history
+- считать суммы
+- фильтровать по датам
+- находить проблемные категории
+- давать конкретные советы
+"""
+
         payload = {
-            "model": "deepseek/deepseek-chat",
+            "model": "google/gemini-2.0-flash-001",
             "messages": [
-                {"role": "system", "content": system_instruction},
-                {"role": "user", "content": prompt}
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": prompt},
+                {
+                    "role": "assistant",
+                    "content": "История транзакций:\n" + json.dumps(
+                        history, ensure_ascii=False
+                    )
+                }
             ],
             "temperature": 0.2
         }
-        
-        response_raw = requests.post("https://openrouter.ai/api/v1/chat/completions", headers=headers, json=payload, timeout=60)
-        ai_message = response_raw.json()['choices'][0]['message']['content']
 
-        # 4. СОХРАНЕНИЕ В БАЗУ
-        if "[JSON_DATA]" in ai_message:
-            match = re.search(r"\[JSON_DATA\]([\s\S]*?)\[/JSON_DATA\]", ai_message)
-            if match and user_id:
-                try:
-                    tx = json.loads(match.group(1).strip())
-                    tx['d'] = datetime.now().strftime("%Y-%m-%d")
-                    tx['id'] = int(time.time() * 1000)
+        headers = {
+            "Authorization": f"Bearer {OPENROUTER_API_KEY}",
+            "Content-Type": "application/json"
+        }
 
-                    supabase.table("finance").insert({
-                        "user_id": str(user_id),
-                        "data": tx
-                    }).execute()
-                    
-                    ai_message = re.sub(r"\[JSON_DATA\].*?\[\/JSON_DATA\]", "", ai_message, flags=re.DOTALL).strip()
-                except Exception as e:
-                    print(f"Insert error: {e}")
+        r = requests.post(
+            "https://openrouter.ai/api/v1/chat/completions",
+            headers=headers,
+            json=payload,
+            timeout=60
+        )
 
-        return jsonify({"choices": [{"message": {"content": ai_message}}]})
+        return jsonify(r.json())
+
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
-# --- ТЕЛЕГРАМ БОТ ---
-@bot.message_handler(commands=['start'])
-def start(message):
-    bot.send_message(message.chat.id, "Привет! Я твой финансовый ИИ-ассистент.")
-
-def run_bot():
-    while True:
-        try:
-            bot.polling(none_stop=True, interval=0, timeout=20)
-        except Exception:
-            time.sleep(5)
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 10000))
-    # Запуск Flask в отдельном потоке
-    threading.Thread(target=lambda: app.run(host="0.0.0.0", port=port), daemon=True).start()
-    # Запуск Бота
-    run_bot()
+    app.run(host="0.0.0.0", port=port)
+
