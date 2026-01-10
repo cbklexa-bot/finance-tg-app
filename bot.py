@@ -16,7 +16,11 @@ supabase: Client = create_client(URL, KEY)
 app = Flask(__name__)
 CORS(app)
 
-# --- ЛОГИКА AI (DeepSeek) ---
+# Хелсчек для Render
+@app.route('/')
+def health():
+    return "Бот и Сервер запущены", 200
+
 @app.route('/chat', methods=['POST'])
 def chat_ai():
     try:
@@ -30,15 +34,17 @@ def chat_ai():
                 t_type = "Доход" if item.get('t') == 'inc' else "Расход"
                 history_str += f"- {item.get('d')}: {t_type} {item.get('s')}р ({item.get('n')})\n"
         else:
-            history_str = "История пуста."
+            history_str = "История операций пуста."
 
         system_instruction = f"""
         Ты финансовый ассистент НейроСчет. Сегодня: {datetime.now().strftime("%Y-%m-%d")}.
         ИСТОРИЯ ОПЕРАЦИЙ:
         {history_str}
         ТВОЯ ЗАДАЧА:
-        1. ЗАПИСЬ: Если есть сумма и категория, верни JSON {{"action": "add", "amount": число, "category": "...", "type": "inc/exp", "note": "..."}}
-        2. ЧАТ/АНАЛИЗ: Если записи нет, верни JSON {{"action": "chat", "text": "ответ"}}
+        1. Если пользователь хочет ЗАПИСАТЬ:
+           Верни СТРОГО JSON: {{"action": "add", "amount": число, "category": "название", "type": "inc/exp", "note": "описание"}}
+        2. Если пользователь спрашивает АНАЛИЗ, СОВЕТ или ВОПРОС:
+           Верни СТРОГО JSON: {{"action": "chat", "text": "Твой ответ"}}
         КАТЕГОРИИ: зарплата, инвест, подарок, продукты, авто, жильё, шопинг, аптека, отдых, прочее.
         """
 
@@ -60,26 +66,19 @@ def chat_ai():
         
         return jsonify({"choices": [{"message": {"content": clean_json}}]})
     except Exception as e:
+        print(f"AI Error: {e}")
         return jsonify({"error": str(e)}), 500
 
-# --- ТЕЛЕГРАМ БОТ (Команды и Оплата) ---
-
+# --- ТЕЛЕГРАМ БОТ ---
 @bot.message_handler(commands=['start'])
 def start(message):
-    # Логика проверки параметра pay (ссылка вида t.me/bot?start=pay)
     if "pay" in message.text:
         bot.send_invoice(
-            message.chat.id, 
-            title="НейроСчет: Подписка", 
-            description="Доступ к функциям на 30 дней", 
-            invoice_payload="month_sub", 
-            provider_token="", 
-            currency="XTR", 
-            prices=[telebot.types.LabeledPrice("Активировать", 100)], 
-            start_parameter="pay"
+            message.chat.id, "НейроСчет: Подписка", "Доступ на 30 дней", "month_sub",
+            "", "XTR", [telebot.types.LabeledPrice("Активировать", 100)], start_parameter="pay"
         )
     else:
-        bot.send_message(message.chat.id, "✨ Добро пожаловать в НейроСчет! Используйте приложение для управления финансами.")
+        bot.send_message(message.chat.id, "✨ Добро пожаловать в НейроСчет! Используйте Mini App для управления финансами.")
 
 @bot.pre_checkout_query_handler(func=lambda query: True)
 def checkout(query):
@@ -90,22 +89,22 @@ def success(message):
     new_date = (datetime.now() + timedelta(days=30)).isoformat()
     try:
         supabase.table("subscriptions").upsert({"user_id": message.from_user.id, "expires_at": new_date}).execute()
-        bot.send_message(message.chat.id, "✅ Оплата прошла! Доступ продлен на 30 дней. Перезапустите Mini App.")
+        bot.send_message(message.chat.id, "✅ Оплата прошла! Доступ продлен на 30 дней.")
     except Exception as e:
-        bot.send_message(message.chat.id, "⚠️ Ошибка обновления базы. Напишите в поддержку.")
+        print(f"Supabase error: {e}")
 
 # --- ПРАВИЛЬНЫЙ ЗАПУСК ---
 
 def run_bot():
-    print("Бот запущен...")
-    bot.infinity_polling(timeout=10, long_polling_timeout=5)
+    print("Запуск бота...")
+    bot.infinity_polling(timeout=20, long_polling_timeout=10)
 
 if __name__ == "__main__":
     # 1. Запускаем бота в отдельном потоке
-    bot_thread = threading.Thread(target=run_bot)
+    bot_thread = threading.Thread(target=run_bot, daemon=True)
     bot_thread.start()
 
-    # 2. Запускаем Flask в основном потоке (Render требует, чтобы порт слушал основной процесс)
+    # 2. Запускаем Flask в основном потоке (обязательно для Render)
     port = int(os.environ.get("PORT", 10000))
-    print(f"Сервер Flask запущен на порту {port}...")
+    print(f"Flask сервер запущен на порту {port}")
     app.run(host="0.0.0.0", port=port)
