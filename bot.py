@@ -8,13 +8,13 @@ from datetime import datetime, timedelta
 TOKEN = os.environ.get('BOT_TOKEN')
 URL = os.environ.get('SUPABASE_URL')
 KEY = os.environ.get('SUPABASE_KEY')
-OR_KEY = os.environ.get('OPENROUTER_API_KEY') # Ключ OpenRouter для DeepSeek
+OR_KEY = os.environ.get('OPENROUTER_API_KEY')
 
 bot = telebot.TeleBot(TOKEN)
 supabase: Client = create_client(URL, KEY)
 
 app = Flask(__name__)
-CORS(app) # Разрешаем запросы с вашего домена .pages.dev
+CORS(app)
 
 # --- ЛОГИКА AI (DeepSeek) ---
 @app.route('/chat', methods=['POST'])
@@ -22,34 +22,51 @@ def chat_ai():
     try:
         data = request.json
         prompt = data.get('prompt', '')
+        # Получаем историю транзакций из фронтенда
+        history_data = data.get('history', [])
         
-        # Инструкция для ИИ, чтобы он понимал категории доходов
-        system_instruction = f"""
-        Ты финансовый ассистент. Сегодня: {datetime.now().strftime("%Y-%m-%d")}.
-        Твоя задача: проанализировать текст и вернуть JSON.
-        
-        КАТЕГОРИИ ДОХОДОВ (t: "inc"): зарплата, инвест, подарок.
-        КАТЕГОРИИ РАСХОДОВ (t: "exp"): продукты, авто, жильё, шопинг, аптека, отдых.
-        Если категория не подходит, используй "прочее".
+        # Форматируем историю для ИИ, чтобы он мог её прочитать
+        history_str = ""
+        if history_data:
+            for item in history_data[:50]: # Передаем последние 50 записей для анализа
+                type_label = "Доход" if item.get('t') == 'inc' else "Расход"
+                history_str += f"- {item.get('d')}: {type_label} {item.get('s')}р ({item.get('n')})\n"
+        else:
+            history_str = "История пуста."
 
-        ВЕРНИ СТРОГО JSON:
-        {{"action": "add", "amount": число, "category": "название", "type": "inc/exp", "note": "описание"}}
+        # ОБНОВЛЕННАЯ ИНСТРУКЦИЯ
+        system_instruction = f"""
+        Ты финансовый ассистент и аналитик. Сегодня: {datetime.now().strftime("%Y-%m-%d")}.
+        
+        ИСТОРИЯ ОПЕРАЦИЙ ПОЛЬЗОВАТЕЛЯ:
+        {history_str}
+        
+        ТВОЯ ЗАДАЧА:
+        1. Если пользователь хочет ЗАПИСАТЬ (например: "купил хлеб 100"): 
+           Верни JSON: {{"action": "add", "amount": число, "category": "название", "type": "inc/exp", "note": "описание"}}
+        
+        2. Если пользователь спрашивает АНАЛИЗ, СОВЕТ или ВОПРОС (например: "сколько я потратил?", "дай совет"):
+           Верни JSON: {{"action": "chat", "text": "Твой подробный ответ на основе истории операций выше"}}
+           
+        ПРАВИЛА:
+        - КАТЕГОРИИ: зарплата, инвест, подарок, продукты, авто, жильё, шопинг, аптека, отдых, прочее.
+        - Если в сообщении НЕТ суммы для записи, всегда выбирай action: "chat".
+        - Для анализа используй только те данные, которые видишь в истории выше.
         """
 
         headers = {"Authorization": f"Bearer {OR_KEY}", "Content-Type": "application/json"}
         payload = {
-            "model": "deepseek/deepseek-chat", # Используем DeepSeek V3
+            "model": "deepseek/deepseek-chat",
             "messages": [
                 {"role": "system", "content": system_instruction},
                 {"role": "user", "content": prompt}
             ],
-            "temperature": 0.1
+            "temperature": 0.2 # Немного повысили для более "человечных" советов
         }
         
         resp = requests.post("https://openrouter.ai/api/v1/chat/completions", headers=headers, json=payload, timeout=60)
         ai_content = resp.json()['choices'][0]['message']['content']
         
-        # Очищаем ответ от возможных Markdown-тегов
         clean_json = re.sub(r"```json|```", "", ai_content).strip()
         
         return jsonify({"choices": [{"message": {"content": clean_json}}]})
@@ -57,14 +74,11 @@ def chat_ai():
         print(f"AI Error: {e}")
         return jsonify({"error": str(e)}), 500
 
-# --- ВАША ЛОГИКА ТЕЛЕГРАМ БОТА (Платежи) ---
+# --- ЛОГИКА ТЕЛЕГРАМ БОТА ---
 @bot.message_handler(commands=['start'])
 def start(message):
     if "pay" in message.text:
-        bot.send_invoice(
-            message.chat.id, "НейроСчет: Подписка", "Доступ на 30 дней", "month_sub",
-            "", "XTR", [telebot.types.LabeledPrice("Активировать", 100)], start_parameter="pay"
-        )
+        bot.send_invoice(message.chat.id, "НейроСчет: Подписка", "Доступ на 30 дней", "month_sub", "", "XTR", [telebot.types.LabeledPrice("Активировать", 100)], start_parameter="pay")
     else:
         bot.send_message(message.chat.id, "Добро пожаловать в НейроСчет!")
 
@@ -78,7 +92,6 @@ def success(message):
     supabase.table("subscriptions").upsert({"user_id": message.from_user.id, "expires_at": new_date}).execute()
     bot.send_message(message.chat.id, "✅ Подписка продлена!")
 
-# --- ЗАПУСК ---
 def run_flask():
     port = int(os.environ.get("PORT", 10000))
     app.run(host="0.0.0.0", port=port)
