@@ -1019,7 +1019,6 @@ async function askAI() {
     }
     chat.scrollTop = chat.scrollHeight;
 }
-
       
         
         window.quickAdd = async (t, c, s, n) => { db.unshift({ id: Date.now(), t, c, s, n, d: new Date().toISOString().split('T')[0] }); updateUI(); await cloudSave(); go('home'); };
@@ -1285,6 +1284,7 @@ async function editGoalName() {
     </script>
 </body>
 </html>
+
 
 
 
