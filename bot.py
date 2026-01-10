@@ -34,44 +34,42 @@ def chat_ai():
         prompt = data.get('prompt') or data.get('message') or ""
         user_id = data.get('user_id')
 
-        # 1. СБОР ДАННЫХ ИЗ ТАБЛИЦЫ FINANCE
+        # 1. СБОР ДАННЫХ (ЧИТАЕМ ИЗ КОЛОНКИ data)
         now = datetime.now()
         current_date_str = now.strftime("%Y-%m-%d")
         
-        stats_summary = "Данных нет."
         history_text = "История операций пуста."
         
         if user_id:
             try:
-                # !!! ЗАМЕНЕНО: transactions -> finance
-                res = supabase.table("finance").select("*").eq("user_id", str(user_id)).order("created_at", desc=True).limit(50).execute()
+                # Выбираем колонку data, где лежат ваши JSON-объекты
+                res = supabase.table("finance").select("data").eq("user_id", str(user_id)).order("created_at", desc=True).limit(40).execute()
+                
                 if res.data:
-                    inc = sum(t['amount'] for t in res.data if t['type'] == 'income')
-                    exp = sum(t['amount'] for t in res.data if t['type'] == 'expense')
-                    stats_summary = f"ТЕКУЩИЙ БАЛАНС: {inc - exp} руб. (Всего Доход: {inc}, Всего Расход: {exp})"
-                    lines = [f"- {t['created_at'][:10]}: {t['type']} | {t['category']} | {t['amount']} руб. ({t.get('description','')})" for t in res.data]
+                    lines = []
+                    for item in res.data:
+                        d = item.get('data', {})
+                        # Извлекаем данные из вложенного объекта (s - сумма, n - описание, t - тип, c - иконка)
+                        type_str = "Доход" if d.get('t') == 'inc' else "Расход"
+                        lines.append(f"- {d.get('d')}: {type_str} | {d.get('c')} | {d.get('s')} руб. ({d.get('n')})")
                     history_text = "\n".join(lines)
             except Exception as e: 
-                print(f"DB Error: {e}")
+                print(f"DB Read Error: {e}")
 
-        # 2. УМНАЯ ИНСТРУКЦИЯ
+        # 2. УМНАЯ ИНСТРУКЦИЯ (Подстроена под ваш формат {c, d, n, s, t, id})
         system_instruction = f"""
-        Ты — Личный Финансовый Эксперт-Консультант. Твоя задача: вести учет и помогать пользователю богатеть.
+        Ты — Личный Финансовый Эксперт. Твоя задача: анализировать траты и записывать новые.
         Сегодня: {current_date_str}.
 
-        ТВОИ КАТЕГОРИИ:
-        - РАСХОДЫ: авто, жильё, продукты, аптека, шопинг, отдых, подарки, прочее.
-        - ДОХОДЫ: зарплата, инвест, подарок, прочее.
+        ТВОИ КАТЕГОРИИ (используй эти иконки):
+        🛒 Продукты, 🚗 Авто, 🏠 Жильё, 🛍️ Шопинг, 💊 Аптека, 🎭 Отдых, 🎁 Подарки, 💵 Зарплата, 📈 Инвест, 📦 Прочее.
 
-        ТВОИ ПРАВИЛА:
-        1. АНАЛИЗ: Если пользователь спрашивает о тратах, считай их СТРОГО по списку операций ниже.
-        2. ЗАПИСЬ: Если пользователь говорит что потратил или заработал, ты САМ определяешь категорию. 
-           Всегда отвечай подтверждением и в конце добавляй JSON:
-           [JSON_DATA]{{"amount": число, "category": "категория", "type": "expense|income", "description": "описание"}}[/JSON_DATA]
-
-        БАЛАНС СЕЙЧАС: {stats_summary}
-        ИСТОРИЯ ОПЕРАЦИЙ:
+        ИСТОРИЯ ОПЕРАЦИЙ ПОЛЬЗОВАТЕЛЯ:
         {history_text}
+
+        ПРАВИЛА:
+        1. Если пользователь говорит записать расход/доход, ответь коротко и добавь JSON:
+        [JSON_DATA]{{"s": число, "c": "иконка", "t": "exp|inc", "n": "описание"}}[/JSON_DATA]
         """
 
         # 3. ЗАПРОС К OPENROUTER
@@ -91,29 +89,33 @@ def chat_ai():
         }
         
         response_raw = requests.post("https://openrouter.ai/api/v1/chat/completions", headers=headers, json=payload, timeout=60)
-        response = response_raw.json()
-        
-        if 'choices' not in response:
-            return jsonify({"choices": [{"message": {"content": "Ошибка связи с DeepSeek."}}]})
-            
-        ai_message = response['choices'][0]['message']['content']
+        ai_message = response_raw.json()['choices'][0]['message']['content']
 
-        # 4. ОБРАБОТКА JSON И СОХРАНЕНИЕ В FINANCE
+        # 4. ОБРАБОТКА JSON И СОХРАНЕНИЕ (В КОЛОНКУ data)
         if "[JSON_DATA]" in ai_message:
-            match = re.search(r"\[JSON_DATA\](.*?)\[/JSON_DATA\]", ai_message)
+            match = re.search(r"\[JSON_DATA\]([\s\S]*?)\[/JSON_DATA\]", ai_message)
             if match and user_id:
                 try:
-                    tx = json.loads(match.group(1))
-                    # !!! ЗАМЕНЕНО: transactions -> finance
+                    tx = json.loads(match.group(1).strip())
+                    
+                    # Формируем структуру в точности как в твоем примере из базы
+                    new_entry = {
+                        "c": tx.get('c', '📦'),
+                        "d": current_date_str,
+                        "n": tx.get('n', ''),
+                        "s": float(tx.get('s', 0)),
+                        "t": tx.get('t', 'exp'),
+                        "id": int(time.time() * 1000)
+                    }
+
+                    # Сохраняем в колонку data
                     supabase.table("finance").insert({
                         "user_id": str(user_id),
-                        "amount": float(tx['amount']),
-                        "category": tx['category'].lower(),
-                        "type": tx['type'],
-                        "description": tx.get('description', '')
+                        "data": new_entry
                     }).execute()
-                    # Убираем JSON из текста ответа, чтобы не пугать пользователя
-                    ai_message = ai_message.replace(match.group(0), "").strip()
+                    
+                    # Убираем технический JSON из ответа
+                    ai_message = re.sub(r"\[JSON_DATA\].*?\[/JSON_DATA\]", "", ai_message, flags=re.DOTALL).strip()
                 except Exception as e:
                     print(f"Insert error: {e}")
 
@@ -123,10 +125,10 @@ def chat_ai():
         print(f"Global Error: {e}")
         return jsonify({"error": str(e)}), 500
 
-# --- ОСТАЛЬНАЯ ЧАСТЬ БОТА (БЕЗ ИЗМЕНЕНИЙ) ---
+# --- ТЕЛЕГРАМ БОТ ---
 @bot.message_handler(commands=['start'])
 def start(message):
-    bot.send_message(message.chat.id, "Привет! Я твой финансовый эксперт. Я вижу твою историю из облака и готов помогать.")
+    bot.send_message(message.chat.id, "Привет! Я твой финансовый эксперт. Я вижу твою историю и готов помогать.")
 
 def run_bot():
     bot.remove_webhook()
