@@ -406,37 +406,6 @@
        let userId = tg.initDataUnsafe?.user?.id?.toString() || 'user_demo';
         let db = [];
         let budgets = JSON.parse(localStorage.getItem('fin_budgets_' + userId)) || [];
-        function calculateStats(period = 'month') {
-    const now = new Date();
-    const start =
-        period === 'month'
-            ? new Date(now.getFullYear(), now.getMonth(), 1)
-            : new Date(0);
-
-    const stats = {
-        totalExp: 0,
-        totalInc: 0,
-        byCategory: {}
-    };
-
-    db.forEach(tx => {
-        const d = new Date(tx.d);
-        if (d < start) return;
-
-        if (tx.t === 'exp') {
-            stats.totalExp += tx.s;
-            stats.byCategory[tx.c] =
-                (stats.byCategory[tx.c] || 0) + tx.s;
-        }
-
-        if (tx.t === 'inc') {
-            stats.totalInc += tx.s;
-        }
-    });
-
-    return stats;
-}
-
 
         // === ПЕРЕМЕННЫЕ БЛОКНОТА (ОБНОВЛЕНО) ===
         let tasks = [];
@@ -1012,62 +981,115 @@ async function askAI() {
     input.value = '';
 
     const tempId = 'ai-' + Date.now();
-    chat.innerHTML += `<div id="${tempId}" class="ai-msg">🤖 Анализирую…</div>`;
+    chat.innerHTML += `<div id="${tempId}" class="ai-msg">🤖 Думаю и анализирую…</div>`;
     chat.scrollTop = chat.scrollHeight;
 
     try {
-        const stats = calculateStats('month'); // ⬅️ КЛЮЧЕВО
-
         const response = await fetch('/chat', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 prompt: q,
-                history: db,
-                stats
+                history: db.slice(0, 300) // ⬅️ ВСЕГДА массив
             })
         });
 
-        if (!response.ok) throw new Error('HTTP ' + response.status);
+        if (!response.ok) {
+            throw new Error('HTTP ' + response.status);
+        }
 
         const raw = await response.json();
         const content = raw?.choices?.[0]?.message?.content || '';
 
-        let ai;
-        try {
-            ai = JSON.parse(content);
-        } catch {
-            document.getElementById(tempId).innerText = content;
+        if (!content) {
+            document.getElementById(tempId).innerText =
+                '⚠️ AI не вернул ответ. Попробуй переформулировать запрос.';
             return;
         }
 
-        // ===== КАТЕГОРИИ =====
-        const iconMap = {
-            продукты: "🛒",
-            авто: "🚗",
-            жильё: "🏠",
-            шопинг: "🛍️",
-            аптека: "💊",
-            отдых: "🎭",
-            зарплата: "💵",
-            инвест: "📈",
-            подарок: "🎁",
-            прочее: "📦"
-        };
+        // ===== КЛЮЧЕВОЙ ФИКС =====
+        // Ищем JSON внутри любого текста
+        const jsonMatch = content.match(/\{[\s\S]*?\}/);
 
-        // ===== ДОБАВЛЕНИЕ =====
-        if (ai.action === 'add') {
+        let ai = null;
+        if (jsonMatch) {
+            try {
+                ai = JSON.parse(jsonMatch[0]);
+            } catch (e) {
+                console.warn('Ошибка парсинга JSON от AI', e);
+            }
+        }
+
+        /* ===== НОРМАЛИЗАЦИЯ КАТЕГОРИЙ ===== */
+        const catAliases = {
+    // ===== РАСХОДЫ =====
+    авто: ["авто","машина","бензин","заправ","топливо","азс","мойка"],
+    продукты: ["продукты","еда","магазин","супермаркет","хлеб"],
+    жильё: ["жиль","квартир","коммун","интернет","свет","вода"],
+    шопинг: ["шопинг","одежд","техника","покупк"],
+    аптека: ["аптек","лекарств","таблет"],
+    отдых: ["отдых","кафе","ресторан","кино"],
+
+    // ===== ДОХОДЫ =====
+    зарплата: ["зарплат","зп","оклад"],
+    инвест: ["дивиденд","акци","инвест","процент","доход"],
+    подарок: ["подар","перевод","дали","получил"]
+};
+
+       function resolveCategory(cat = "") {
+    if (!cat) return "прочее";
+
+    cat = cat.toLowerCase().trim();
+
+    // ✅ 1. ЕСЛИ AI УЖЕ ВЕРНУЛ НОРМАЛЬНУЮ КАТЕГОРИЮ — БЕРЁМ ЕЁ
+    if (iconMap[cat]) {
+        return cat;
+    }
+
+    // ✅ 2. ИНАЧЕ ПЫТАЕМСЯ ОПРЕДЕЛИТЬ ПО СЛОВАМ
+    for (const [key, arr] of Object.entries(catAliases)) {
+        if (arr.some(w => cat.includes(w))) {
+            return key;
+        }
+    }
+
+    // ✅ 3. ФОЛБЭК
+    return "прочее";
+}
+
+
+                 const iconMap = {
+                      // Расходы
+                    продукты: "🛒",
+                    авто: "🚗",
+                    жильё: "🏠",
+                    шопинг: "🛍️",
+                    аптека: "💊",
+                    отдых: "🎭",
+
+                      // Доходы
+                   зарплата: "💵",
+                   инвест: "📈",
+                   подарок: "🎁",
+                   прочее: "📦"
+};
+
+
+        /* ===== ДОБАВЛЕНИЕ ТРАНЗАКЦИИ ===== */
+        if (ai && ai.action === 'add') {
+            const catKey = resolveCategory(ai.category || ai.note || '');
             const amount = Number(ai.amount);
+
             if (!amount || amount <= 0) {
                 document.getElementById(tempId).innerText =
-                    '⚠️ Не смог определить сумму.';
+                    '⚠️ Не смог корректно определить сумму.';
                 return;
             }
 
             const entry = {
                 id: Date.now(),
                 t: ai.type === 'inc' ? 'inc' : 'exp',
-                c: iconMap[ai.category] || "📦",
+                c: iconMap[catKey],
                 s: amount,
                 n: ai.note || '',
                 d: new Date().toISOString().split('T')[0]
@@ -1084,18 +1106,22 @@ async function askAI() {
             return;
         }
 
-        // ===== АНАЛИЗ =====
-        document.getElementById(tempId).innerText = ai.text;
+        /* ===== АНАЛИЗ / ЧАТ ===== */
+        if (ai && ai.action === 'chat') {
+            document.getElementById(tempId).innerText = ai.text;
+        } else {
+            // fallback — обычный текст
+            document.getElementById(tempId).innerText = content;
+        }
 
     } catch (e) {
         console.error(e);
         document.getElementById(tempId).innerText =
-            '❌ Ошибка связи с AI';
+            '❌ Ошибка связи с AI. Попробуй позже.';
     }
 
     chat.scrollTop = chat.scrollHeight;
 }
-
 
       
         
@@ -1362,6 +1388,7 @@ async function editGoalName() {
     </script>
 </body>
 </html>
+
 
 
 
