@@ -1,80 +1,83 @@
 import os
+import time
 import json
-import requests
-from flask import Flask, request, jsonify
+import re
+from datetime import datetime
+from flask import Flask, request, jsonify, send_from_directory
 from flask_cors import CORS
+import requests
+from supabase import create_client, Client
 
-# --- ENV ---
+# ================== НАСТРОЙКИ ==================
+SUPABASE_URL = os.environ.get("SUPABASE_URL")
+SUPABASE_KEY = os.environ.get("SUPABASE_KEY")
 OPENROUTER_API_KEY = os.environ.get("OPENROUTER_API_KEY")
 
-app = Flask(__name__)
+supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
+
+app = Flask(__name__, static_folder='.')
 CORS(app)
 
+# ================== FRONT ==================
+@app.route("/")
+def index():
+    return send_from_directory('.', 'index.html')
+
+# ================== AI CHAT ==================
 @app.route("/chat", methods=["POST"])
-def chat_ai():
+def chat():
     try:
-        data = request.json or {}
-        prompt = data.get("prompt", "")
-        history = data.get("history", [])
+        body = request.json or {}
+        prompt = body.get("prompt", "")
+        history = body.get("history", [])
+        stats = body.get("stats", {})
 
-        system_prompt = """
-Ты — умный личный финансовый ассистент.
+        system_prompt = f"""
+Ты — ЛИЧНЫЙ ФИНАНСОВЫЙ АССИСТЕНТ пользователя.
 
-ТЕБЕ ПЕРЕДАЮТ history — МАССИВ транзакций пользователя.
+ТЕБЕ ПЕРЕДАЮТ:
+- history: массив транзакций (для контекста)
+- stats: ГОТОВЫЕ ПОСЧИТАННЫЕ ДАННЫЕ
 
-ФОРМАТ history:
-- t: "exp" | "inc"
-- c: категория (строка)
-- s: сумма (число)
-- n: описание
-- d: дата YYYY-MM-DD
+СТРОГО ЗАПРЕЩЕНО:
+❌ считать суммы
+❌ пересчитывать категории
+❌ угадывать цифры
 
-СТРОГИЕ ПРАВИЛА:
+РАЗРЕШЕНО:
+✅ объяснять
+✅ анализировать
+✅ давать советы
+✅ делать выводы ТОЛЬКО по stats
 
-1. ЕСЛИ пользователь описывает ФАКТ:
-   "купил", "заправил", "получил", "зарплата", "дивиденды"
+ФОРМАТЫ ОТВЕТА:
 
-➡️ ВЕРНИ ТОЛЬКО JSON:
-{
-  "action": "add",
-  "type": "exp | inc",
-  "category": "строка",
-  "amount": число,
-  "note": "кратко"
-}
+1️⃣ Добавление транзакции (ТОЛЬКО если пользователь явно описал факт):
+{{
+  "action":"add",
+  "type":"exp|inc",
+  "category":"строка",
+  "amount":число,
+  "note":"описание"
+}}
 
-❌ НИКАКОГО текста вместе с JSON
+2️⃣ Анализ / вопрос:
+{{
+  "action":"chat",
+  "text":"человеческий анализ + советы"
+}}
 
-2. ЕСЛИ пользователь просит:
-   анализ, итоги, советы, период, статистику
-
-➡️ ВЕРНИ:
-{
-  "action": "chat",
-  "text": "подробный анализ на основе history"
-}
-
-❌ ЗАПРЕЩЕНО добавлять транзакции при анализе
-❌ ЗАПРЕЩЕНО возвращать JSON при анализе
-
-3. Ты ОБЯЗАН:
-- использовать ВСЮ history
-- считать суммы
-- фильтровать по датам
-- находить проблемные категории
-- давать конкретные советы
+Если stats пуст — скажи, что анализ невозможен.
 """
 
         payload = {
-            "model": "google/gemini-2.0-flash-001",
+            "model": "deepseek/deepseek-chat",
             "messages": [
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": prompt},
                 {
                     "role": "assistant",
-                    "content": "История транзакций:\n" + json.dumps(
-                        history, ensure_ascii=False
-                    )
+                    "content": f"STATS:\n{json.dumps(stats, ensure_ascii=False)}"
                 }
             ],
             "temperature": 0.2
@@ -92,7 +95,14 @@ def chat_ai():
             timeout=60
         )
 
-        return jsonify(r.json())
+        data = r.json()
+        content = data["choices"][0]["message"]["content"]
+
+        return jsonify({
+            "choices": [
+                {"message": {"content": content}}
+            ]
+        })
 
     except Exception as e:
         return jsonify({"error": str(e)}), 500
@@ -101,4 +111,5 @@ def chat_ai():
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 10000))
     app.run(host="0.0.0.0", port=port)
+
 
