@@ -981,7 +981,7 @@ async function askAI() {
     input.value = '';
 
     const tempId = 'ai-' + Date.now();
-    chat.innerHTML += `<div id="${tempId}" class="ai-msg">🤖 Думаю...</div>`;
+    chat.innerHTML += `<div id="${tempId}" class="ai-msg">🤖 Думаю и анализирую…</div>`;
     chat.scrollTop = chat.scrollHeight;
 
     try {
@@ -990,35 +990,118 @@ async function askAI() {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 prompt: q,
-                user_id: userId // Убедитесь, что userId определен глобально
+                history: db // ⬅️ ВСЯ история пользователя
             })
         });
 
-        const raw = await response.json();
-        const content = raw?.choices?.[0]?.message?.content || 'Нет ответа от ИИ';
-
-        // 1. Проверяем, была ли запись (сервер присылает JSON внутри текста)
-        const hasJson = content.includes("[JSON_DATA]");
-        
-        // 2. Очищаем текст от меток [JSON_DATA] для пользователя
-        const cleanMsg = content.replace(/\[JSON_DATA\].*?\[\/JSON_DATA\]/gs, "").trim();
-        
-        document.getElementById(tempId).innerText = cleanMsg;
-
-        // 3. Если запись была произведена — просто обновляем интерфейс из облака
-        if (hasJson || cleanMsg.toLowerCase().includes("записал") || cleanMsg.toLowerCase().includes("добавил")) {
-            if (typeof syncFromCloud === 'function') {
-                // Ждем 500мс, чтобы Supabase успел обработать запрос от бэкенда
-                setTimeout(syncFromCloud, 500);
-            }
+        if (!response.ok) {
+            throw new Error('HTTP ' + response.status);
         }
+
+        const raw = await response.json();
+        const content = raw?.choices?.[0]?.message?.content;
+
+        if (!content) {
+            document.getElementById(tempId).innerText =
+                '⚠️ AI не вернул ответ. Попробуй иначе.';
+            return;
+        }
+
+        let ai;
+        try {
+            ai = JSON.parse(content);
+        } catch {
+            document.getElementById(tempId).innerText = content;
+            return;
+        }
+
+        /* ===== КАТЕГОРИИ ===== */
+        const catAliases = {
+            авто: ["авто","машин","бенз","заправ","азс","топлив"],
+            продукты: ["продукт","еда","магаз","хлеб","кофе"],
+            жильё: ["кварт","жиль","коммун","свет","вода","интернет"],
+            шопинг: ["одежд","техник","покуп"],
+            аптека: ["аптек","лекар","таблет"],
+            отдых: ["кафе","пиво","ресторан","кино","отдых"],
+
+            зарплата: ["зарплат","зп","оклад"],
+            инвест: ["дивиденд","акци","инвест","процент"],
+            подарок: ["подар","перевод","дали","получил"]
+        };
+
+        function resolveCategory(text = "") {
+            text = text.toLowerCase();
+            for (const [key, words] of Object.entries(catAliases)) {
+                if (words.some(w => text.includes(w))) return key;
+            }
+            return "прочее";
+        }
+
+        const iconMap = {
+            продукты: "🛒",
+            авто: "🚗",
+            жильё: "🏠",
+            шопинг: "🛍️",
+            аптека: "💊",
+            отдых: "🎭",
+
+            зарплата: "💵",
+            инвест: "📈",
+            подарок: "🎁",
+            прочее: "📦"
+        };
+
+        /* ===== ДОБАВЛЕНИЕ ===== */
+        if (ai.action === 'add') {
+            const amount = Number(ai.amount);
+            if (!amount || amount <= 0) {
+                document.getElementById(tempId).innerText =
+                    '⚠️ Не смог определить сумму.';
+                return;
+            }
+
+            const catKey = resolveCategory(
+                ai.category || ai.note || q
+            );
+
+            const entry = {
+                id: Date.now(),
+                t: ai.type === 'inc' ? 'inc' : 'exp',
+                c: iconMap[catKey],
+                s: amount,
+                n: ai.note || '',
+                d: new Date().toISOString().split('T')[0]
+            };
+
+            db.unshift(entry);
+            updateUI();
+            await cloudSave();
+
+            document.getElementById(tempId).innerHTML = `
+                ✅ <b>Записано</b><br>
+                ${entry.c} ${entry.s.toLocaleString()} ₽ — ${entry.n}
+            `;
+            return;
+        }
+
+        /* ===== АНАЛИЗ ===== */
+        if (ai.action === 'chat') {
+            document.getElementById(tempId).innerText = ai.text;
+            return;
+        }
+
+        document.getElementById(tempId).innerText =
+            '🤖 Я здесь. Спроси иначе.';
 
     } catch (e) {
         console.error(e);
-        document.getElementById(tempId).innerText = '❌ Ошибка связи с сервером.';
+        document.getElementById(tempId).innerText =
+            '❌ Ошибка связи с AI';
     }
+
     chat.scrollTop = chat.scrollHeight;
 }
+
       
         
         window.quickAdd = async (t, c, s, n) => { db.unshift({ id: Date.now(), t, c, s, n, d: new Date().toISOString().split('T')[0] }); updateUI(); await cloudSave(); go('home'); };
@@ -1284,6 +1367,7 @@ async function editGoalName() {
     </script>
 </body>
 </html>
+
 
 
 
