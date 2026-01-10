@@ -1,46 +1,72 @@
-import os
-import telebot
-import threading
-import http.server
-import socketserver
+import os, time, threading, telebot, requests, json, re
+from flask import Flask, request, jsonify
+from flask_cors import CORS
 from supabase import create_client, Client
 from datetime import datetime, timedelta
 
-# --- БЛОК ДЛЯ СТАБИЛЬНОЙ РАБОТЫ НА RENDER (Health Check) ---
-def run_health_server():
-    handler = http.server.SimpleHTTPRequestHandler
-    port = int(os.environ.get("PORT", 10000))
-    with socketserver.TCPServer(("", port), handler) as httpd:
-        print(f"Health check server running on port {port}")
-        httpd.serve_forever()
-
-threading.Thread(target=run_health_server, daemon=True).start()
-# -----------------------------------------------------------
-
-# Загрузка ключей из переменных окружения Render
+# --- НАСТРОЙКИ ---
 TOKEN = os.environ.get('BOT_TOKEN')
 URL = os.environ.get('SUPABASE_URL')
 KEY = os.environ.get('SUPABASE_KEY')
+OR_KEY = os.environ.get('OPENROUTER_API_KEY') # Ключ OpenRouter для DeepSeek
 
 bot = telebot.TeleBot(TOKEN)
 supabase: Client = create_client(URL, KEY)
 
+app = Flask(__name__)
+CORS(app) # Разрешаем запросы с вашего домена .pages.dev
+
+# --- ЛОГИКА AI (DeepSeek) ---
+@app.route('/chat', methods=['POST'])
+def chat_ai():
+    try:
+        data = request.json
+        prompt = data.get('prompt', '')
+        
+        # Инструкция для ИИ, чтобы он понимал категории доходов
+        system_instruction = f"""
+        Ты финансовый ассистент. Сегодня: {datetime.now().strftime("%Y-%m-%d")}.
+        Твоя задача: проанализировать текст и вернуть JSON.
+        
+        КАТЕГОРИИ ДОХОДОВ (t: "inc"): зарплата, инвест, подарок.
+        КАТЕГОРИИ РАСХОДОВ (t: "exp"): продукты, авто, жильё, шопинг, аптека, отдых.
+        Если категория не подходит, используй "прочее".
+
+        ВЕРНИ СТРОГО JSON:
+        {{"action": "add", "amount": число, "category": "название", "type": "inc/exp", "note": "описание"}}
+        """
+
+        headers = {"Authorization": f"Bearer {OR_KEY}", "Content-Type": "application/json"}
+        payload = {
+            "model": "deepseek/deepseek-chat", # Используем DeepSeek V3
+            "messages": [
+                {"role": "system", "content": system_instruction},
+                {"role": "user", "content": prompt}
+            ],
+            "temperature": 0.1
+        }
+        
+        resp = requests.post("https://openrouter.ai/api/v1/chat/completions", headers=headers, json=payload, timeout=60)
+        ai_content = resp.json()['choices'][0]['message']['content']
+        
+        # Очищаем ответ от возможных Markdown-тегов
+        clean_json = re.sub(r"```json|```", "", ai_content).strip()
+        
+        return jsonify({"choices": [{"message": {"content": clean_json}}]})
+    except Exception as e:
+        print(f"AI Error: {e}")
+        return jsonify({"error": str(e)}), 500
+
+# --- ВАША ЛОГИКА ТЕЛЕГРАМ БОТА (Платежи) ---
 @bot.message_handler(commands=['start'])
 def start(message):
-    # Проверяем, пришел ли пользователь из приложения по ссылке ?start=pay
     if "pay" in message.text:
         bot.send_invoice(
-            message.chat.id,
-            title="НейроСчет: Подписка",
-            description="Доступ к функциям НейроСчет на 30 дней",
-            invoice_payload="month_sub",
-            provider_token="", # Для Telegram Stars всегда пусто
-            currency="XTR",    # Валюта: Telegram Stars
-            prices=[telebot.types.LabeledPrice(label="Активировать НейроСчет", amount=100)], # 100 звезд ≈ 199 руб
-            start_parameter="pay"
+            message.chat.id, "НейроСчет: Подписка", "Доступ на 30 дней", "month_sub",
+            "", "XTR", [telebot.types.LabeledPrice("Активировать", 100)], start_parameter="pay"
         )
     else:
-        bot.send_message(message.chat.id, "Добро пожаловать в НейроСчет! Используйте Mini App для управления финансами.")
+        bot.send_message(message.chat.id, "Добро пожаловать в НейроСчет!")
 
 @bot.pre_checkout_query_handler(func=lambda query: True)
 def checkout(query):
@@ -48,21 +74,15 @@ def checkout(query):
 
 @bot.message_handler(content_types=['successful_payment'])
 def success(message):
-    user_id = message.from_user.id
-    # Рассчитываем новую дату (текущая дата + 30 дней)
     new_date = (datetime.now() + timedelta(days=30)).isoformat()
-    
-    try:
-        # Автоматическое обновление подписки в Supabase
-        supabase.table("subscriptions").upsert({
-            "user_id": user_id, 
-            "expires_at": new_date
-        }).execute()
-        
-        bot.send_message(message.chat.id, "✅ Оплата прошла успешно! Ваш доступ к НейроСчет продлен на 30 дней. Перезапустите приложение.")
-    except Exception as e:
-        print(f"Ошибка Supabase: {e}")
-        bot.send_message(message.chat.id, "⚠️ Оплата прошла, но возникла ошибка при обновлении базы. Пожалуйста, напишите в поддержку.")
+    supabase.table("subscriptions").upsert({"user_id": message.from_user.id, "expires_at": new_date}).execute()
+    bot.send_message(message.chat.id, "✅ Подписка продлена!")
 
-print("Бот НейроСчет запущен и готов к работе...")
-bot.polling(none_stop=True)
+# --- ЗАПУСК ---
+def run_flask():
+    port = int(os.environ.get("PORT", 10000))
+    app.run(host="0.0.0.0", port=port)
+
+if __name__ == "__main__":
+    threading.Thread(target=run_flask, daemon=True).start()
+    bot.polling(none_stop=True)
