@@ -981,37 +981,15 @@ async function askAI() {
     input.value = '';
 
     const tempId = 'ai-' + Date.now();
-    chat.innerHTML += `<div id="${tempId}" class="ai-msg">🤖 Думаю и анализирую…</div>`;
+    chat.innerHTML += `<div id="${tempId}" class="ai-msg">🤖 Думаю и анализирую историю…</div>`;
     chat.scrollTop = chat.scrollHeight;
 
-    // --- НАСТРОЙКИ КАТЕГОРИЙ (ВАШИ АЛИАСЫ) ---
+    // Справочник иконок
     const iconMap = {
         продукты: "🛒", авто: "🚗", жильё: "🏠", шопинг: "🛍️",
         аптека: "💊", отдых: "🎭", зарплата: "💵", инвест: "📈",
         подарок: "🎁", прочее: "📦"
     };
-
-    const catAliases = {
-        авто: ["авто","машина","бензин","заправ","топливо","мойка"],
-        продукты: ["продукты","еда","магазин","супермаркет","хлеб"],
-        жильё: ["жиль","квартир","коммун","интернет","свет","вода"],
-        шопинг: ["шопинг","одежд","техника","покупк"],
-        аптека: ["аптек","лекарств","таблет"],
-        отдых: ["отдых","кафе","ресторан","кино"],
-        зарплата: ["зарплат","зп","оклад"],
-        инвест: ["дивиденд","акци","инвест"],
-        подарок: ["подар","перевод","дали"]
-    };
-
-    function resolveCategory(cat = "") {
-        if (!cat) return "прочее";
-        cat = cat.toLowerCase().trim();
-        if (iconMap[cat]) return cat;
-        for (const [key, arr] of Object.entries(catAliases)) {
-            if (arr.some(w => cat.includes(w))) return key;
-        }
-        return "прочее";
-    }
 
     try {
         const response = await fetch('https://finance-tg-app.onrender.com/chat', {
@@ -1019,7 +997,7 @@ async function askAI() {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 prompt: q,
-                user_id: userId // Передаем ID, историю сервер подтянет сам из finance
+                user_id: userId 
             })
         });
 
@@ -1033,55 +1011,55 @@ async function askAI() {
             return;
         }
 
-        // ПРОВЕРКА НА JSON ВНУТРИ ОТВЕТА
+        // Проверка на наличие JSON данных для записи
         const jsonMatch = content.match(/\[JSON_DATA\]([\s\S]*?)\[\/JSON_DATA\]/);
         
         if (jsonMatch) {
             try {
                 const aiData = JSON.parse(jsonMatch[1]);
-                const catKey = resolveCategory(aiData.category);
-                const amount = Number(aiData.amount);
+                
+                // Формируем запись В ТОЧНОМ ФОРМАТЕ вашей колонки data
+                const entry = {
+                    id: Date.now(),
+                    t: (aiData.t === 'inc' || aiData.type === 'income') ? 'inc' : 'exp', // тип (exp/inc)
+                    c: aiData.c || iconMap[aiData.category] || "📦",                      // иконка
+                    s: Number(aiData.s || aiData.amount),                               // сумма
+                    n: aiData.n || aiData.description || '',                            // описание
+                    d: new Date().toISOString().split('T')[0]                           // дата (ГГГГ-ММ-ДД)
+                };
 
-                if (amount && amount > 0) {
-                    // Создаем запись для мгновенного отображения в UI
-                    const entry = {
-                        id: Date.now(),
-                        type: aiData.type === 'income' ? 'income' : 'expense',
-                        category: catKey,
-                        amount: amount,
-                        description: aiData.description || '',
-                        created_at: new Date().toISOString()
-                    };
-
-                    // Добавляем в локальную базу (db) и обновляем экран
-                    if (typeof db !== 'undefined') {
-                        db.unshift(entry);
-                        if (typeof renderFinance === 'function') renderFinance();
-                    }
-
-                    // Чистим текст от JSON-тегов и выводим красивое подтверждение
-                    const cleanMsg = content.replace(/\[JSON_DATA\].*?\[\/JSON_DATA\]/gs, "").trim();
-                    document.getElementById(tempId).innerHTML = `
-                        ${cleanMsg}<br><br>
-                        ✅ <b>Записано в базу:</b><br>
-                        ${iconMap[catKey]} ${amount.toLocaleString()} ₽ — ${entry.description}
-                    `;
-                    
-                    // Синхронизируем, чтобы данные не пропали
-                    setTimeout(() => { if(typeof syncFromCloud === 'function') syncFromCloud(); }, 1000);
-                    return;
+                // Добавляем в локальный массив для мгновенного отображения
+                if (typeof db !== 'undefined') {
+                    db.unshift(entry);
+                    // Вызываем вашу основную функцию обновления интерфейса
+                    if (typeof updateUI === 'function') updateUI();
                 }
+
+                // Выводим текст ответа ИИ без тегов
+                const cleanMsg = content.replace(/\[JSON_DATA\].*?\[\/JSON_DATA\]/gs, "").trim();
+                document.getElementById(tempId).innerHTML = `
+                    ${cleanMsg}<br><br>
+                    ✅ <b>Добавлено:</b> ${entry.c} ${entry.s.toLocaleString()} ₽
+                `;
+                
+                // Вибрация (если в Telegram)
+                if(window.tg) tg.HapticFeedback.notificationOccurred('success');
+
+                // Синхронизация с облаком (через 1.5 сек, чтобы сервер успел записать)
+                setTimeout(() => { if(typeof syncFromCloud === 'function') syncFromCloud(); }, 1500);
+                return;
+
             } catch (e) {
-                console.error("Ошибка обработки записи:", e);
+                console.error("Ошибка парсинга записи от ИИ:", e);
             }
         }
 
-        // ЕСЛИ ЭТО ПРОСТО ЧАТ (БЕЗ ЗАПИСИ)
+        // Если это просто диалог без записи в базу
         document.getElementById(tempId).innerText = content;
 
     } catch (e) {
         console.error(e);
-        document.getElementById(tempId).innerText = '❌ Ошибка связи с ИИ.';
+        document.getElementById(tempId).innerText = '❌ Ошибка связи с сервером ИИ.';
     }
 
     chat.scrollTop = chat.scrollHeight;
@@ -1352,6 +1330,7 @@ async function editGoalName() {
     </script>
 </body>
 </html>
+
 
 
 
