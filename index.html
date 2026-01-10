@@ -985,14 +985,15 @@ async function askAI() {
     chat.scrollTop = chat.scrollHeight;
 
     try {
-        const response = await fetch('/chat', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                prompt: q,
-                history: db.slice(0, 300) // ⬅️ ВСЕГДА массив
-            })
-        });
+        const response = await fetch('https://finance-tg-app.onrender.com/chat', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+        prompt: q,
+        user_id: window.userId, // Важно передавать user_id для истории
+        history: db.slice(0, 20) // Передаем немного истории для контекста
+    })
+});
 
         if (!response.ok) {
             throw new Error('HTTP ' + response.status);
@@ -1031,9 +1032,9 @@ async function askAI() {
     отдых: ["отдых","кафе","ресторан","кино"],
 
     // ===== ДОХОДЫ =====
-    зарплата: ["зарплат","зп","оклад"],
-    инвест: ["дивиденд","акци","инвест","процент","доход"],
-    подарок: ["подар","перевод","дали","получил"]
+зарплата: ["зарплат", "зп", "оклад", "аванс", "получил", "работа", "выплата"],
+    инвест: ["дивиденд", "акци", "инвест", "процент", "крипт", "доход", "стейкинг"],
+    подарок: ["подар", "перевод", "дали", "нашел", "бонус", "премия"]
 };
 
        function resolveCategory(cat = "") {
